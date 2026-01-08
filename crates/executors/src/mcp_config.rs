@@ -299,6 +299,7 @@ impl CodingAgent {
             CodingAgent::Codex(_) => Codex,
             CodingAgent::Opencode(_) => Opencode,
             CodingAgent::Copilot(..) => Copilot,
+            CodingAgent::CustomAgent(_) => Passthrough,
         };
 
         let canonical = PRECONFIGURED_MCP_SERVERS.clone();

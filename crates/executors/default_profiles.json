@@ -234,6 +234,25 @@
           "model": "glm-4.6"
         }
       }
+    },
+    "CUSTOM": {
+      "DEFAULT": {
+        "CUSTOM": {}
+      },
+      "CLDM": {
+        "CUSTOM": {
+          "name": "Claude(Minimax 2.1)",
+          "base_agent": { "CLAUDE_CODE": {} },
+          "base_command_override": "cldm"
+        }
+      },
+      "CLDG": {
+        "CUSTOM": {
+          "name": "Claude(GLM 4.7)",
+          "base_agent": { "CLAUDE_CODE": {} },
+          "base_command_override": "cldg"
+        }
+      }
     }
   }
 }

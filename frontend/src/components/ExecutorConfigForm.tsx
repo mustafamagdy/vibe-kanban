@@ -64,6 +64,27 @@ export function ExecutorConfigForm({
       env: {
         'ui:field': 'KeyValueField',
       },
+      // For CUSTOM agent, use the BaseAgentField to conditionally show config
+      base_agent: {
+        'ui:field': 'BaseAgentField',
+      },
+      // Custom agent settings with descriptions
+      name: {
+        'ui:title': 'Display Name',
+        'ui:description': 'A friendly name for this custom agent',
+      },
+      append_prompt: {
+        'ui:title': 'Append Prompt',
+        'ui:description': 'Extra text appended to every prompt',
+      },
+      base_command_override: {
+        'ui:title': 'Base Command Override',
+        'ui:description': 'Custom command to run (e.g., "claude --settings /path/to/settings.json")',
+      },
+      additional_params: {
+        'ui:title': 'Additional Parameters',
+        'ui:description': 'Extra CLI arguments to append',
+      },
     }),
     []
   );
