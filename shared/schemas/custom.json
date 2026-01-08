@@ -1,0 +1,809 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "properties": {
+    "name": {
+      "description": "Display name for this custom agent",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "base_agent": {
+      "description": "Which agent type to base this custom agent on\nUses CustomAgentBaseAgentSchema for schema generation to provide better form UX",
+      "type": "object",
+      "properties": {
+        "type_field": {
+          "description": "The type of base agent (for dropdown selection)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "CLAUDE_CODE",
+            "AMP",
+            "GEMINI",
+            "CODEX",
+            "OPENCODE",
+            "CURSOR_AGENT",
+            "QWEN_CODE",
+            "COPILOT",
+            "DROID",
+            null
+          ]
+        },
+        "CLAUDE_CODE": {
+          "description": "ClaudeCode specific settings",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "append_prompt": {
+              "title": "Append Prompt",
+              "description": "Extra text appended to the prompt",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "textarea",
+              "default": null
+            },
+            "claude_code_router": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "plan": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "approvals": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dangerously_skip_permissions": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "disable_api_key": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "base_command_override": {
+              "title": "Base Command Override",
+              "description": "Override the base command with a custom command",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "additional_params": {
+              "title": "Additional Parameters",
+              "description": "Additional parameters to append to the base command",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "title": "Environment Variables",
+              "description": "Environment variables to set when running the executor",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "AMP": {
+          "description": "AMP specific settings",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "append_prompt": {
+              "title": "Append Prompt",
+              "description": "Extra text appended to the prompt",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "textarea",
+              "default": null
+            },
+            "dangerously_allow_all": {
+              "title": "Dangerously Allow All",
+              "description": "Allow all commands to be executed, even if they are not safe.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "base_command_override": {
+              "title": "Base Command Override",
+              "description": "Override the base command with a custom command",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "additional_params": {
+              "title": "Additional Parameters",
+              "description": "Additional parameters to append to the base command",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "title": "Environment Variables",
+              "description": "Environment variables to set when running the executor",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "GEMINI": {
+          "description": "Gemini specific settings",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "append_prompt": {
+              "title": "Append Prompt",
+              "description": "Extra text appended to the prompt",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "textarea",
+              "default": null
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "yolo": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "base_command_override": {
+              "title": "Base Command Override",
+              "description": "Override the base command with a custom command",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "additional_params": {
+              "title": "Additional Parameters",
+              "description": "Additional parameters to append to the base command",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "title": "Environment Variables",
+              "description": "Environment variables to set when running the executor",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "CODEX": {
+          "description": "Codex specific settings",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "append_prompt": {
+              "title": "Append Prompt",
+              "description": "Extra text appended to the prompt",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "textarea",
+              "default": null
+            },
+            "sandbox": {
+              "description": "Sandbox policy modes for Codex",
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "auto",
+                "read-only",
+                "workspace-write",
+                "danger-full-access",
+                null
+              ]
+            },
+            "ask_for_approval": {
+              "description": "Determines when the user is consulted to approve Codex actions.\n\n- `UnlessTrusted`: Read-only commands are auto-approved. Everything else will\n  ask the user to approve.\n- `OnFailure`: All commands run in a restricted sandbox initially. If a\n  command fails, the user is asked to approve execution without the sandbox.\n- `OnRequest`: The model decides when to ask the user for approval.\n- `Never`: Commands never ask for approval. Commands that fail in the\n  restricted sandbox are not retried.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "unless-trusted",
+                "on-failure",
+                "on-request",
+                "never",
+                null
+              ]
+            },
+            "oss": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "model_reasoning_effort": {
+              "description": "Reasoning effort for the underlying model",
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                null
+              ]
+            },
+            "model_reasoning_summary": {
+              "description": "Model reasoning summary style",
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "auto",
+                "concise",
+                "detailed",
+                "none",
+                null
+              ]
+            },
+            "model_reasoning_summary_format": {
+              "description": "Format for model reasoning summaries",
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "none",
+                "experimental",
+                null
+              ]
+            },
+            "profile": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "base_instructions": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "include_apply_patch_tool": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "model_provider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "compact_prompt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "developer_instructions": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "base_command_override": {
+              "title": "Base Command Override",
+              "description": "Override the base command with a custom command",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "additional_params": {
+              "title": "Additional Parameters",
+              "description": "Additional parameters to append to the base command",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "title": "Environment Variables",
+              "description": "Environment variables to set when running the executor",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "OPENCODE": {
+          "description": "Opencode specific settings",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "append_prompt": {
+              "title": "Append Prompt",
+              "description": "Extra text appended to the prompt",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "textarea",
+              "default": null
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "mode": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "auto_approve": {
+              "description": "Auto-approve agent actions",
+              "type": "boolean",
+              "default": true
+            },
+            "base_command_override": {
+              "title": "Base Command Override",
+              "description": "Override the base command with a custom command",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "additional_params": {
+              "title": "Additional Parameters",
+              "description": "Additional parameters to append to the base command",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "title": "Environment Variables",
+              "description": "Environment variables to set when running the executor",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "CURSOR_AGENT": {
+          "description": "CursorAgent specific settings",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "append_prompt": {
+              "title": "Append Prompt",
+              "description": "Extra text appended to the prompt",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "textarea",
+              "default": null
+            },
+            "force": {
+              "description": "Force allow commands unless explicitly denied",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "model": {
+              "description": "auto, sonnet-4.5, sonnet-4.5-thinking, gpt-5, opus-4.1, grok, composer-1",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "base_command_override": {
+              "title": "Base Command Override",
+              "description": "Override the base command with a custom command",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "additional_params": {
+              "title": "Additional Parameters",
+              "description": "Additional parameters to append to the base command",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "title": "Environment Variables",
+              "description": "Environment variables to set when running the executor",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "QWEN_CODE": {
+          "description": "QwenCode specific settings",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "append_prompt": {
+              "title": "Append Prompt",
+              "description": "Extra text appended to the prompt",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "textarea",
+              "default": null
+            },
+            "yolo": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "base_command_override": {
+              "title": "Base Command Override",
+              "description": "Override the base command with a custom command",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "additional_params": {
+              "title": "Additional Parameters",
+              "description": "Additional parameters to append to the base command",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "title": "Environment Variables",
+              "description": "Environment variables to set when running the executor",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "COPILOT": {
+          "description": "Copilot specific settings",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "append_prompt": {
+              "title": "Append Prompt",
+              "description": "Extra text appended to the prompt",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "textarea",
+              "default": null
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "allow_all_tools": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "allow_tool": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "deny_tool": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "add_dir": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "disable_mcp_server": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "base_command_override": {
+              "title": "Base Command Override",
+              "description": "Override the base command with a custom command",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "additional_params": {
+              "title": "Additional Parameters",
+              "description": "Additional parameters to append to the base command",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "title": "Environment Variables",
+              "description": "Environment variables to set when running the executor",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "DROID": {
+          "description": "Droid specific settings",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "append_prompt": {
+              "title": "Append Prompt",
+              "description": "Extra text appended to the prompt",
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "textarea",
+              "default": null
+            },
+            "autonomy": {
+              "title": "Autonomy Level",
+              "description": "Permission level for file and system operations",
+              "type": "string",
+              "enum": [
+                "normal",
+                "low",
+                "medium",
+                "high",
+                "skip-permissions-unsafe"
+              ],
+              "default": "skip-permissions-unsafe"
+            },
+            "model": {
+              "title": "Model",
+              "description": "Model to use (e.g., gpt-5-codex, claude-sonnet-4-5-20250929, gpt-5-2025-08-07, claude-opus-4-1-20250805, claude-haiku-4-5-20251001, glm-4.6)",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reasoning_effort": {
+              "title": "Reasoning Effort",
+              "description": "Reasoning effort level: none, dynamic, off, low, medium, high",
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "none",
+                "dynamic",
+                "off",
+                "low",
+                "medium",
+                "high",
+                null
+              ]
+            },
+            "base_command_override": {
+              "title": "Base Command Override",
+              "description": "Override the base command with a custom command",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "additional_params": {
+              "title": "Additional Parameters",
+              "description": "Additional parameters to append to the base command",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "title": "Environment Variables",
+              "description": "Environment variables to set when running the executor",
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "append_prompt": {
+      "title": "Append Prompt",
+      "description": "Extra text appended to the prompt",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "textarea",
+      "default": null
+    },
+    "base_command_override": {
+      "title": "Base Command Override",
+      "description": "Override the base command with a custom command",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "additional_params": {
+      "title": "Additional Parameters",
+      "description": "Additional parameters to append to the base command",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "env": {
+      "title": "Environment Variables",
+      "description": "Environment variables to set when running the executor",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "description": "User-defined custom agent that wraps another agent type with custom command",
+  "type": "object"
+}

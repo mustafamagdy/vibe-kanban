@@ -19,7 +19,7 @@ use crate::{
     env::ExecutionEnv,
     executors::{
         amp::Amp, claude::ClaudeCode, codex::Codex, copilot::Copilot, cursor::CursorAgent,
-        droid::Droid, gemini::Gemini, opencode::Opencode, qwen::QwenCode,
+        custom_agent::CustomAgent, droid::Droid, gemini::Gemini, opencode::Opencode, qwen::QwenCode,
     },
     mcp_config::McpConfig,
 };
@@ -30,6 +30,7 @@ pub mod claude;
 pub mod codex;
 pub mod copilot;
 pub mod cursor;
+pub mod custom_agent;
 pub mod droid;
 pub mod gemini;
 pub mod opencode;
@@ -75,6 +76,7 @@ pub enum ExecutorError {
 #[enum_dispatch]
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, TS, Display, EnumDiscriminants, VariantNames,
+    JsonSchema,
 )]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
@@ -100,6 +102,10 @@ pub enum CodingAgent {
     QwenCode,
     Copilot,
     Droid,
+    #[serde(rename = "CUSTOM")]
+    #[strum_discriminants(serde(rename = "CUSTOM"))]
+    #[strum_discriminants(strum(serialize = "CUSTOM"))]
+    CustomAgent,
 }
 
 impl CodingAgent {
@@ -160,7 +166,8 @@ impl CodingAgent {
             | Self::Gemini(_)
             | Self::QwenCode(_)
             | Self::Droid(_)
-            | Self::Opencode(_) => vec![BaseAgentCapability::SessionFork],
+            | Self::Opencode(_)
+            | Self::CustomAgent(_) => vec![BaseAgentCapability::SessionFork],
             Self::Codex(_) => vec![
                 BaseAgentCapability::SessionFork,
                 BaseAgentCapability::SetupHelper,
@@ -320,5 +327,18 @@ mod tests {
         let result: Result<BaseCodingAgent, _> = serde_json::from_str(r#""CURSOR""#);
         assert!(result.is_ok(), "CURSOR should deserialize via serde");
         assert_eq!(result.unwrap(), BaseCodingAgent::CursorAgent);
+    }
+
+    #[test]
+    fn test_custom_agent_deserialization() {
+        // Test from_str for CUSTOM (used by de_base_coding_agent_kebab in profile.rs)
+        let result = BaseCodingAgent::from_str("CUSTOM");
+        assert!(result.is_ok(), "CUSTOM should be valid for from_str");
+        assert_eq!(result.unwrap(), BaseCodingAgent::CustomAgent);
+
+        // Test serde deserialization for CUSTOM
+        let result: Result<BaseCodingAgent, _> = serde_json::from_str(r#""CUSTOM""#);
+        assert!(result.is_ok(), "CUSTOM should deserialize via serde");
+        assert_eq!(result.unwrap(), BaseCodingAgent::CustomAgent);
     }
 }

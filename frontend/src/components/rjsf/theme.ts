@@ -12,7 +12,7 @@ import {
   ObjectFieldTemplate,
   FormTemplate,
 } from './templates';
-import { KeyValueField } from './fields';
+import { KeyValueField, BaseAgentField } from './fields';
 
 export const customWidgets: RegistryWidgetsType = {
   TextWidget,
@@ -32,6 +32,7 @@ export const customTemplates = {
 
 export const customFields: RegistryFieldsType = {
   KeyValueField,
+  BaseAgentField,
 };
 
 export const shadcnTheme = {
