@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Plus, X } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
-import { tasksApi } from '@/lib/api';
+import { tasksApi, attemptsApi } from '@/lib/api';
 import type { RepoBranchStatus, Workspace } from 'shared/types';
 import { openTaskForm } from '@/lib/openTaskForm';
 import { FeatureShowcaseDialog } from '@/components/dialogs/global/FeatureShowcaseDialog';
@@ -18,7 +18,7 @@ import { useProject } from '@/contexts/ProjectContext';
 import { useTaskAttempts } from '@/hooks/useTaskAttempts';
 import { useTaskAttemptWithSession } from '@/hooks/useTaskAttempt';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useBranchStatus, useAttemptExecution } from '@/hooks';
+import { useBranchStatus, useAttemptExecution, useProjectRepos } from '@/hooks';
 import { paths } from '@/lib/paths';
 import { ExecutionProcessesProvider } from '@/contexts/ExecutionProcessesContext';
 import { ClickedElementsProvider } from '@/contexts/ClickedElementsProvider';
@@ -196,6 +196,8 @@ export function ProjectTasks() {
   const isPanelOpen = isTaskPanelOpen || isSharedPanelOpen;
 
   const { config, updateAndSaveConfig, loading } = useUserSystem();
+
+  const { data: projectRepos = [] } = useProjectRepos(projectId);
 
   const isLoaded = !loading;
   const showcaseId = showcases.taskPanel.id;
@@ -764,11 +766,31 @@ export function ProjectTasks() {
           parent_workspace_id: task.parent_workspace_id,
           image_ids: null,
         });
+
+        // Auto-start task when moved to inprogress from todo
+        if (
+          newStatus === 'inprogress' &&
+          task.status === 'todo' &&
+          !task.has_in_progress_attempt &&
+          config?.executor_profile &&
+          projectRepos.length > 0
+        ) {
+          const repos = projectRepos.map((repo) => ({
+            repo_id: repo.id,
+            target_branch: 'main',
+          }));
+
+          await attemptsApi.create({
+            task_id: task.id,
+            executor_profile_id: config.executor_profile,
+            repos,
+          });
+        }
       } catch (err) {
         console.error('Failed to update task status:', err);
       }
     },
-    [tasksById]
+    [tasksById, config, projectRepos]
   );
 
   const getSharedTask = useCallback(
