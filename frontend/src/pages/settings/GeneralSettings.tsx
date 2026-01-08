@@ -466,6 +466,34 @@ export function GeneralSettings() {
 
       <Card>
         <CardHeader>
+          <CardTitle>{t('settings.general.tasks.title')}</CardTitle>
+          <CardDescription>
+            {t('settings.general.tasks.description')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="task-form-auto-start"
+              checked={draft?.task_form_auto_start_by_default ?? false}
+              onCheckedChange={(checked: boolean) =>
+                updateDraft({ task_form_auto_start_by_default: checked })
+              }
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="task-form-auto-start" className="cursor-pointer">
+                {t('settings.general.tasks.autoStart.label')}
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.general.tasks.autoStart.helper')}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>{t('settings.general.pullRequests.title')}</CardTitle>
           <CardDescription>
             {t('settings.general.pullRequests.description')}
