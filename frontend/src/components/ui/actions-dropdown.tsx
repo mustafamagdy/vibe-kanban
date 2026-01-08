@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Play } from 'lucide-react';
 import type { TaskWithAttemptStatus } from 'shared/types';
 import type { Workspace } from 'shared/types';
 import { useOpenInEditor } from '@/hooks/useOpenInEditor';
@@ -158,12 +158,23 @@ export function ActionsDropdown({
     StopShareTaskDialog.show({ sharedTask });
   };
 
+  const handleStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!task?.id) return;
+    CreateAttemptDialog.show({
+      taskId: task.id,
+    });
+  };
+
   const canReassign =
     Boolean(task) &&
     Boolean(sharedTask) &&
     sharedTask?.assignee_user_id === userId;
   const canStopShare =
     Boolean(sharedTask) && sharedTask?.assignee_user_id === userId;
+
+  // Task is in Todo column if there's no attempt
+  const isTodoTask = !attempt;
 
   return (
     <>
@@ -180,6 +191,18 @@ export function ActionsDropdown({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {isTodoTask && (
+            <>
+              <DropdownMenuItem
+                disabled={!task?.id}
+                onClick={handleStart}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                {t('createAttemptDialog.start')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           {hasAttemptActions && (
             <>
               <DropdownMenuLabel>{t('actionsMenu.attempt')}</DropdownMenuLabel>
