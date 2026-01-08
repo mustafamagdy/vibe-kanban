@@ -145,7 +145,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           status: 'todo',
           executorProfileId: baseProfile,
           repoBranches: defaultRepoBranches,
-          autoStart: true,
+          autoStart: system.config?.task_form_auto_start_by_default ?? false,
         };
 
       case 'subtask':
@@ -157,10 +157,16 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           status: 'todo',
           executorProfileId: baseProfile,
           repoBranches: defaultRepoBranches,
-          autoStart: true,
+          autoStart: system.config?.task_form_auto_start_by_default ?? false,
         };
     }
-  }, [mode, props, system.config?.executor_profile, defaultRepoBranches]);
+  }, [
+    mode,
+    props,
+    system.config?.executor_profile,
+    system.config?.task_form_auto_start_by_default,
+    defaultRepoBranches,
+  ]);
 
   // Form submission handler
   const handleSubmit = async ({ value }: { value: TaskFormValues }) => {

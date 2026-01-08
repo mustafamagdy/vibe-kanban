@@ -135,6 +135,14 @@
           }
         }
       },
+      "tasks": {
+        "title": "Task Creation",
+        "description": "Configure default behavior when creating new tasks",
+        "autoStart": {
+          "label": "Start tasks immediately by default",
+          "helper": "When enabled, new tasks will start running immediately after creation."
+        }
+      },
       "pullRequests": {
         "title": "Pull Requests",
         "description": "Configure PR creation behavior",
