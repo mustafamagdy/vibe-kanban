@@ -173,8 +173,8 @@ export function ActionsDropdown({
   const canStopShare =
     Boolean(sharedTask) && sharedTask?.assignee_user_id === userId;
 
-  // Task is in Todo column if there's no attempt
-  const isTodoTask = !attempt;
+  // Task can be started if it's in todo status and doesn't have an in-progress attempt
+  const canStartTask = task?.status === 'todo' && !task.has_in_progress_attempt;
 
   return (
     <>
@@ -191,7 +191,7 @@ export function ActionsDropdown({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {isTodoTask && (
+          {canStartTask && (
             <>
               <DropdownMenuItem
                 disabled={!task?.id}
