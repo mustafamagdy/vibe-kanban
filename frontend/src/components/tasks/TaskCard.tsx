@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { KanbanCard } from '@/components/ui/shadcn-io/kanban';
-import { Link, Loader2, XCircle } from 'lucide-react';
+import { Link, Loader2, XCircle, Square } from 'lucide-react';
 import type { TaskWithAttemptStatus } from 'shared/types';
 import { ActionsDropdown } from '@/components/ui/actions-dropdown';
 import { Button } from '@/components/ui/button';
-import { useNavigateWithSearch } from '@/hooks';
+import { useNavigateWithSearch, useTaskAttempts } from '@/hooks';
 import { paths } from '@/lib/paths';
 import { attemptsApi } from '@/lib/api';
 import type { SharedTaskRecord } from '@/hooks/useProjectTasks';
 import { TaskCardHeader } from './TaskCardHeader';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks';
+import { StopTaskConfirmationDialog } from '@/components/dialogs/tasks/StopTaskConfirmationDialog';
 
 type Task = TaskWithAttemptStatus;
 
@@ -36,7 +37,15 @@ export function TaskCard({
   const { t } = useTranslation('tasks');
   const navigate = useNavigateWithSearch();
   const [isNavigatingToParent, setIsNavigatingToParent] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const { isSignedIn } = useAuth();
+
+  // Fetch attempts to find the running attempt ID
+  const { data: attempts = [] } = useTaskAttempts(task.id, {
+    enabled: task.has_in_progress_attempt,
+  });
+  // Since has_in_progress_attempt is true, the first attempt is the running one
+  const runningAttempt = attempts[0];
 
   const handleClick = useCallback(() => {
     onViewDetails(task);
@@ -111,7 +120,31 @@ export function TaskCard({
           right={
             <>
               {task.has_in_progress_attempt && (
-                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                <div
+                  onMouseEnter={() => setIsHovered(true)}
+                  onMouseLeave={() => setIsHovered(false)}
+                >
+                  {isHovered && runningAttempt ? (
+                    <Button
+                      variant="icon"
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        void StopTaskConfirmationDialog.show({
+                          taskTitle: task.title,
+                          attemptId: runningAttempt.id,
+                        });
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      title={t('stopTask')}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Square className="h-4 w-4 fill-current" />
+                    </Button>
+                  ) : (
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  )}
+                </div>
               )}
               {task.last_attempt_failed && (
                 <XCircle className="h-4 w-4 text-destructive" />
