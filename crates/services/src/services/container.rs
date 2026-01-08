@@ -167,6 +167,11 @@ pub trait ContainerService {
         share_publisher: Option<&SharePublisher>,
         ctx: &ExecutionContext,
     ) {
+        // Skip status update and notification if process was intentionally killed by user
+        if matches!(ctx.execution_process.status, ExecutionProcessStatus::Killed) {
+            return;
+        }
+
         match Task::update_status(&self.db().pool, ctx.task.id, TaskStatus::InReview).await {
             Ok(_) => {
                 if let Some(publisher) = share_publisher
@@ -182,11 +187,6 @@ pub trait ContainerService {
             Err(e) => {
                 tracing::error!("Failed to update task status to InReview: {e}");
             }
-        }
-
-        // Skip notification if process was intentionally killed by user
-        if matches!(ctx.execution_process.status, ExecutionProcessStatus::Killed) {
-            return;
         }
 
         let title = format!("Task Complete: {}", ctx.task.title);
