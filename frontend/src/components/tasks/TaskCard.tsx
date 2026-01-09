@@ -42,9 +42,10 @@ export function TaskCard({
 
   // Fetch attempts to find the running attempt ID
   const { data: attempts = [] } = useTaskAttempts(task.id, {
-    enabled: task.has_in_progress_attempt,
+    enabled: task.has_in_progress_attempt || task.status === 'inreview',
   });
   // Since has_in_progress_attempt is true, the first attempt is the running one
+  // For inreview tasks, use the first (latest) attempt
   const runningAttempt = attempts[0];
 
   const handleClick = useCallback(() => {
@@ -161,7 +162,7 @@ export function TaskCard({
                   <Link className="h-4 w-4" />
                 </Button>
               )}
-              <ActionsDropdown task={task} sharedTask={sharedTask} />
+              <ActionsDropdown task={task} attempt={runningAttempt} sharedTask={sharedTask} columnStatus={status} />
             </>
           }
         />

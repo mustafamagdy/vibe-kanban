@@ -183,9 +183,12 @@ export const useJsonPatchWsStream = <T extends object>(
         window.clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
       }
+      // Note: We intentionally do NOT reset dataRef.current here.
+      // Data should persist across reconnection cycles to avoid losing
+      // tasks that were added while the WebSocket was reconnecting.
       finishedRef.current = false;
-      dataRef.current = undefined;
-      setData(undefined);
+      // Only clear data state if explicitly requested (not during normal cleanup)
+      // setData(undefined); // Removed to prevent data loss during reconnection
     };
   }, [
     endpoint,

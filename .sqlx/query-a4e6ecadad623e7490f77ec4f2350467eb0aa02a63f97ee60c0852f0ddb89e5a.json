@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT\n                    id               as \"id!: Uuid\",\n                    execution_process_id as \"execution_process_id!: Uuid\",\n                    repo_id as \"repo_id!: Uuid\",\n                    before_head_commit,\n                    after_head_commit,\n                    merge_commit,\n                    had_conflicts_before != 0 as \"had_conflicts_before!: bool\",\n                    created_at as \"created_at!: DateTime<Utc>\",\n                    updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM execution_process_repo_states\n               WHERE execution_process_id = $1\n               ORDER BY created_at ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "execution_process_id!: Uuid",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "repo_id!: Uuid",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "before_head_commit",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "after_head_commit",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "merge_commit",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "had_conflicts_before!: bool",
+        "ordinal": 6,
+        "type_info": "Null"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "a4e6ecadad623e7490f77ec4f2350467eb0aa02a63f97ee60c0852f0ddb89e5a"
+}

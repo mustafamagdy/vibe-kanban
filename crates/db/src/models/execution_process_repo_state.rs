@@ -12,6 +12,7 @@ pub struct ExecutionProcessRepoState {
     pub before_head_commit: Option<String>,
     pub after_head_commit: Option<String>,
     pub merge_commit: Option<String>,
+    pub had_conflicts_before: bool,
     #[ts(type = "Date")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "Date")]
@@ -24,6 +25,7 @@ pub struct CreateExecutionProcessRepoState {
     pub before_head_commit: Option<String>,
     pub after_head_commit: Option<String>,
     pub merge_commit: Option<String>,
+    pub had_conflicts_before: bool,
 }
 
 impl ExecutionProcessRepoState {
@@ -48,15 +50,17 @@ impl ExecutionProcessRepoState {
                         before_head_commit,
                         after_head_commit,
                         merge_commit,
+                        had_conflicts_before,
                         created_at,
                         updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
                 id,
                 execution_process_id,
                 entry.repo_id,
                 entry.before_head_commit,
                 entry.after_head_commit,
                 entry.merge_commit,
+                entry.had_conflicts_before,
                 now,
                 now
             )
@@ -146,6 +150,7 @@ impl ExecutionProcessRepoState {
                     before_head_commit,
                     after_head_commit,
                     merge_commit,
+                    had_conflicts_before != 0 as "had_conflicts_before!: bool",
                     created_at as "created_at!: DateTime<Utc>",
                     updated_at as "updated_at!: DateTime<Utc>"
                FROM execution_process_repo_states
