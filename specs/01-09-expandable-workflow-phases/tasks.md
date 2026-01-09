@@ -40,14 +40,14 @@ description: Task list template for feature implementation
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Update TaskStatus enum in `crates/db/src/models/task.rs` - add Testing and HumanReview variants
-- [ ] T006 Add status transition validation function in `crates/services/src/services/container.rs`
-- [ ] T007 Create complete_testing method in `crates/services/src/services/container.rs`
-- [ ] T008 Create trigger_ai_self_review method in `crates/services/src/services/container.rs`
-- [ ] T009 Create handle_ai_review_result method in `crates/services/src/services/container.rs`
-- [ ] T010 Create approve_human_review method in `crates/services/src/services/container.rs`
-- [ ] T011 Create reject_human_review method in `crates/services/src/services/container.rs`
-- [ ] T012 Add unit tests for status transitions in `crates/services/src/services/container.rs` using `#[cfg(test)]`
+- [x] T005 Update TaskStatus enum in `crates/db/src/models/task.rs` - add Testing and HumanReview variants
+- [x] T006 Add status transition validation function in `crates/services/src/services/container.rs`
+- [x] T007 Create complete_testing method in `crates/services/src/services/container.rs`
+- [x] T008 Create trigger_ai_self_review method in `crates/services/src/services/container.rs`
+- [x] T009 Create handle_ai_review_result method in `crates/services/src/services/container.rs`
+- [x] T010 Create approve_human_review method in `crates/services/src/services/container.rs`
+- [x] T011 Create reject_human_review method in `crates/services/src/services/container.rs`
+- [x] T012 Add unit tests for status transitions in `crates/services/src/services/container.rs` using `#[cfg(test)]`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 

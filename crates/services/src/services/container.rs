@@ -22,7 +22,7 @@ use db::{
         project_repo::{ProjectRepo, ProjectRepoWithName},
         repo::Repo,
         session::{CreateSession, Session, SessionError},
-        task::{Task, TaskStatus},
+        task::{CreateTask, Task, TaskStatus},
         workspace::{Workspace, WorkspaceError},
         workspace_repo::WorkspaceRepo,
     },
@@ -79,6 +79,8 @@ pub enum ContainerError {
     KillFailed(std::io::Error),
     #[error(transparent)]
     Other(#[from] AnyhowError), // Catches any unclassified errors
+    #[error("Invalid status transition: {0}")]
+    InvalidStatusTransition(&'static str),
 }
 
 #[async_trait]
@@ -1282,5 +1284,519 @@ pub trait ContainerService {
 
         tracing::debug!("Started next action: {:?}", next_action);
         Ok(())
+    }
+
+    // =========================================================================
+    // Status Transition Methods for Expandable Workflow Phases
+    // =========================================================================
+
+    /// Validate that a status transition is allowed.
+    /// Returns Ok(()) if valid, Err(reason) if invalid.
+    fn validate_status_transition(
+        &self,
+        from: TaskStatus,
+        to: TaskStatus,
+        _config: Option<&super::config::WorkflowConfig>,
+    ) -> Result<(), &'static str> {
+        use TaskStatus::*;
+
+        // Self-transitions are always allowed (no-op)
+        if from == to {
+            return Ok(());
+        }
+
+        // Guard conditions before match
+        let is_testing_target = matches!(to, Testing);
+        let is_human_review_target = matches!(to, HumanReview);
+        let from_not_in_progress = !matches!(from, InProgress);
+        let from_not_in_review = !matches!(from, InReview);
+
+        match (from, to) {
+            // Valid transitions
+            (Todo, InProgress) => Ok(()),
+            (InProgress, Testing) => Ok(()),
+            (Testing, InReview) => Ok(()),
+            (Testing, InProgress) => Ok(()), // Return to InProgress for revisions
+            (Testing, Done) => Ok(()),
+            (Testing, Cancelled) => Ok(()),
+            (InProgress, InReview) => Ok(()),
+            (InReview, HumanReview) => Ok(()),
+            (InReview, Done) => Ok(()),
+            (InReview, Cancelled) => Ok(()),
+            (HumanReview, Done) => Ok(()),
+            (HumanReview, InProgress) => Ok(()), // Rejected back to work
+            (HumanReview, Cancelled) => Ok(()),
+            (InProgress, Done) => Ok(()),
+            (InProgress, Cancelled) => Ok(()),
+            (Todo, Cancelled) => Ok(()),
+
+            // Invalid transitions - specific cases first
+            (InReview, InProgress) => Err("Use AI review result handler instead"),
+            _ if is_testing_target && from_not_in_progress => {
+                Err("Only InProgress tasks can enter Testing")
+            }
+            _ if is_human_review_target && from_not_in_review => {
+                Err("Only InReview tasks can enter Human Review")
+            }
+
+            // Invalid transitions - catch-all
+            (Todo, _) => Err("Tasks must start in InProgress"),
+            (_, Todo) => Err("Cannot transition to Todo status"),
+            (Done, _) => Err("Cannot transition from Done"),
+            (Cancelled, _) => Err("Cannot transition from Cancelled"),
+            _ => Err("Invalid status transition"),
+        }
+    }
+
+    /// Complete the Testing phase and transition to AI Review.
+    /// Returns the updated task status.
+    async fn complete_testing(
+        &self,
+        task_id: Uuid,
+        share_publisher: Option<&SharePublisher>,
+    ) -> Result<TaskStatus, ContainerError> {
+        let task = Task::find_by_id(&self.db().pool, task_id)
+            .await?
+            .ok_or_else(|| ContainerError::Other(anyhow!("Task not found: {}", task_id)))?;
+
+        // Validate transition
+        self.validate_status_transition(task.status, TaskStatus::InReview, None)
+            .map_err(ContainerError::InvalidStatusTransition)?;
+
+        Task::update_status(&self.db().pool, task_id, TaskStatus::InReview).await?;
+
+        tracing::info!(
+            "Task {} transitioned from Testing to AI Review",
+            task_id
+        );
+
+        // Trigger AI self-review after testing
+        self.trigger_ai_self_review(task_id).await?;
+
+        if let Some(publisher) = share_publisher
+            && let Err(err) = publisher.update_shared_task_by_id(task_id).await
+        {
+            tracing::warn!(
+                ?err,
+                "Failed to propagate shared task update for {}",
+                task_id
+            );
+        }
+
+        Ok(TaskStatus::InReview)
+    }
+
+    /// Trigger AI self-review for a task after Testing phase completion.
+    /// This initiates the AI review process for quality verification.
+    async fn trigger_ai_self_review(&self, task_id: Uuid) -> Result<(), ContainerError> {
+        let task = Task::find_by_id(&self.db().pool, task_id)
+            .await?
+            .ok_or_else(|| ContainerError::Other(anyhow!("Task not found: {}", task_id)))?;
+
+        // Get project configuration for AI review settings
+        let config = self.get_workflow_config(task.project_id).await?;
+
+        // TODO: Implement actual AI review trigger logic here
+        // This would typically:
+        // 1. Fetch the task execution results
+        // 2. Generate AI review prompt
+        // 3. Execute AI review asynchronously
+        // 4. Schedule result handling
+
+        tracing::info!(
+            "Triggered AI self-review for task {} (max iterations: {})",
+            task_id,
+            config.max_ai_review_iterations
+        );
+
+        Ok(())
+    }
+
+    /// Handle the result of an AI review.
+    /// Returns the new task status based on review outcome.
+    async fn handle_ai_review_result(
+        &self,
+        task_id: Uuid,
+        result: AIReviewResult,
+        share_publisher: Option<&SharePublisher>,
+    ) -> Result<TaskStatus, ContainerError> {
+        let task = Task::find_by_id(&self.db().pool, task_id)
+            .await?
+            .ok_or_else(|| ContainerError::Other(anyhow!("Task not found: {}", task_id)))?;
+
+        let config = self.get_workflow_config(task.project_id).await?;
+
+        match result {
+            AIReviewResult::Pass => {
+                // If human review is enabled, go there; otherwise done
+                let new_status = if config.enable_human_review {
+                    TaskStatus::HumanReview
+                } else {
+                    TaskStatus::Done
+                };
+
+                let status_for_log = new_status.clone();
+                Task::update_status(&self.db().pool, task_id, new_status).await?;
+                tracing::info!("Task {} passed AI review, status: {:?}", task_id, status_for_log);
+
+                if let Some(publisher) = share_publisher
+                    && let Err(err) = publisher.update_shared_task_by_id(task_id).await
+                {
+                    tracing::warn!(
+                        ?err,
+                        "Failed to propagate shared task update for {}",
+                        task_id
+                    );
+                }
+
+                Ok(TaskStatus::Done)
+            }
+            AIReviewResult::Fail { issues } => {
+                // Create subtasks for each issue and return to InProgress
+                self.create_review_feedback_subtasks(task_id, &issues).await?;
+
+                Task::update_status(&self.db().pool, task_id, TaskStatus::InProgress).await?;
+                tracing::warn!(
+                    "Task {} failed AI review with {} issues, returned to InProgress",
+                    task_id,
+                    issues.len()
+                );
+
+                if let Some(publisher) = share_publisher
+                    && let Err(err) = publisher.update_shared_task_by_id(task_id).await
+                {
+                    tracing::warn!(
+                        ?err,
+                        "Failed to propagate shared task update for {}",
+                        task_id
+                    );
+                }
+
+                Ok(TaskStatus::InProgress)
+            }
+            AIReviewResult::NeedsIntervention => {
+                // Stay in InReview for manual intervention
+                tracing::info!(
+                    "Task {} needs human intervention in AI Review",
+                    task_id
+                );
+                Ok(TaskStatus::InReview)
+            }
+        }
+    }
+
+    /// Create subtasks from AI review feedback/issues.
+    async fn create_review_feedback_subtasks(
+        &self,
+        parent_task_id: Uuid,
+        issues: &[String],
+    ) -> Result<(), ContainerError> {
+        let parent_task = Task::find_by_id(&self.db().pool, parent_task_id)
+            .await?
+            .ok_or_else(|| ContainerError::Other(anyhow!("Task not found: {}", parent_task_id)))?;
+
+        for issue in issues {
+            let create_task = CreateTask {
+                project_id: parent_task.project_id,
+                title: format!("Fix: {}", issue),
+                description: Some(format!("AI Review issue: {}", issue)),
+                status: Some(TaskStatus::Todo),
+                parent_workspace_id: None,
+                image_ids: None,
+                shared_task_id: None,
+            };
+
+            let _ = Task::create(&self.db().pool, &create_task, Uuid::new_v4()).await?;
+            tracing::debug!("Created subtask for AI review issue: {}", issue);
+        }
+
+        Ok(())
+    }
+
+    /// Approve a task in Human Review, transitioning to Done.
+    async fn approve_human_review(
+        &self,
+        task_id: Uuid,
+        share_publisher: Option<&SharePublisher>,
+    ) -> Result<TaskStatus, ContainerError> {
+        let task = Task::find_by_id(&self.db().pool, task_id)
+            .await?
+            .ok_or_else(|| ContainerError::Other(anyhow!("Task not found: {}", task_id)))?;
+
+        self.validate_status_transition(task.status, TaskStatus::Done, None)
+            .map_err(ContainerError::InvalidStatusTransition)?;
+
+        Task::update_status(&self.db().pool, task_id, TaskStatus::Done).await?;
+        tracing::info!("Task {} approved in Human Review, transitioned to Done", task_id);
+
+        if let Some(publisher) = share_publisher
+            && let Err(err) = publisher.update_shared_task_by_id(task_id).await
+        {
+            tracing::warn!(
+                ?err,
+                "Failed to propagate shared task update for {}",
+                task_id
+            );
+        }
+
+        Ok(TaskStatus::Done)
+    }
+
+    /// Reject a task in Human Review, returning to InProgress for revisions.
+    async fn reject_human_review(
+        &self,
+        task_id: Uuid,
+        reason: &str,
+        share_publisher: Option<&SharePublisher>,
+    ) -> Result<TaskStatus, ContainerError> {
+        let task = Task::find_by_id(&self.db().pool, task_id)
+            .await?
+            .ok_or_else(|| ContainerError::Other(anyhow!("Task not found: {}", task_id)))?;
+
+        self.validate_status_transition(task.status, TaskStatus::InProgress, None)
+            .map_err(ContainerError::InvalidStatusTransition)?;
+
+        Task::update_status(&self.db().pool, task_id, TaskStatus::InProgress).await?;
+        tracing::info!(
+            "Task {} rejected in Human Review, reason: {}, returned to InProgress",
+            task_id,
+            reason
+        );
+
+        // TODO: Create a rejection feedback task or store the reason
+
+        if let Some(publisher) = share_publisher
+            && let Err(err) = publisher.update_shared_task_by_id(task_id).await
+        {
+            tracing::warn!(
+                ?err,
+                "Failed to propagate shared task update for {}",
+                task_id
+            );
+        }
+
+        Ok(TaskStatus::InProgress)
+    }
+
+    /// Get workflow configuration for a project.
+    /// Returns default config if not found.
+    async fn get_workflow_config(
+        &self,
+        _project_id: Uuid,
+    ) -> Result<super::config::WorkflowConfig, ContainerError> {
+        // For now, return default config
+        // TODO: Load from actual config service when implemented
+        Ok(super::config::WorkflowConfig::default())
+    }
+}
+
+/// Result of an AI review operation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AIReviewResult {
+    /// AI review passed, task can proceed
+    Pass,
+    /// AI review failed, task needs revisions
+    Fail { issues: Vec<String> },
+    /// AI cannot determine outcome, needs human intervention
+    NeedsIntervention,
+}
+
+#[cfg(test)]
+mod status_transition_tests {
+    use super::*;
+
+    // Dummy struct to implement ContainerService for testing
+    struct TestContainerService;
+
+    #[async_trait::async_trait]
+    impl ContainerService for TestContainerService {
+        fn msg_stores(&self) -> &Arc<RwLock<HashMap<Uuid, Arc<MsgStore>>>> {
+            unimplemented!()
+        }
+
+        fn db(&self) -> &DBService {
+            unimplemented!()
+        }
+
+        fn git(&self) -> &GitService {
+            unimplemented!()
+        }
+
+        fn share_publisher(&self) -> Option<&SharePublisher> {
+            None
+        }
+
+        fn notification_service(&self) -> &NotificationService {
+            unimplemented!()
+        }
+
+        fn workspace_to_current_dir(&self, _workspace: &Workspace) -> PathBuf {
+            unimplemented!()
+        }
+
+        async fn create(&self, _workspace: &Workspace) -> Result<ContainerRef, ContainerError> {
+            unimplemented!()
+        }
+
+        async fn kill_all_running_processes(&self) -> Result<(), ContainerError> {
+            unimplemented!()
+        }
+
+        async fn delete(&self, _workspace: &Workspace) -> Result<(), ContainerError> {
+            unimplemented!()
+        }
+
+        async fn ensure_container_exists(
+            &self,
+            _workspace: &Workspace,
+        ) -> Result<ContainerRef, ContainerError> {
+            unimplemented!()
+        }
+
+        async fn is_container_clean(&self, _workspace: &Workspace) -> Result<bool, ContainerError> {
+            unimplemented!()
+        }
+
+        async fn start_execution_inner(
+            &self,
+            _workspace: &Workspace,
+            _execution_process: &ExecutionProcess,
+            _executor_action: &ExecutorAction,
+        ) -> Result<(), ContainerError> {
+            unimplemented!()
+        }
+
+        async fn stop_execution(
+            &self,
+            _execution_process: &ExecutionProcess,
+            _status: ExecutionProcessStatus,
+        ) -> Result<(), ContainerError> {
+            unimplemented!()
+        }
+
+        async fn try_commit_changes(&self, _ctx: &ExecutionContext) -> Result<bool, ContainerError> {
+            unimplemented!()
+        }
+
+        async fn copy_project_files(
+            &self,
+            _source_dir: &Path,
+            _target_dir: &Path,
+            _copy_files: &str,
+        ) -> Result<(), ContainerError> {
+            unimplemented!()
+        }
+
+        async fn stream_diff(
+            &self,
+            _workspace: &Workspace,
+            _stats_only: bool,
+        ) -> Result<futures::stream::BoxStream<'static, Result<LogMsg, std::io::Error>>, ContainerError> {
+            unimplemented!()
+        }
+
+        async fn git_branch_prefix(&self) -> String {
+            unimplemented!()
+        }
+    }
+
+    fn create_test_service() -> TestContainerService {
+        TestContainerService
+    }
+
+    #[tokio::test]
+    async fn test_valid_status_transitions() {
+        let service = create_test_service();
+        use TaskStatus::*;
+
+        // Happy path: InProgress -> Testing -> InReview -> Done
+        assert!(service.validate_status_transition(Todo, InProgress, None).is_ok());
+        assert!(service.validate_status_transition(InProgress, Testing, None).is_ok());
+        assert!(service.validate_status_transition(Testing, InReview, None).is_ok());
+        assert!(service.validate_status_transition(InReview, Done, None).is_ok());
+
+        // Human Review path
+        assert!(service.validate_status_transition(InReview, HumanReview, None).is_ok());
+        assert!(service.validate_status_transition(HumanReview, Done, None).is_ok());
+
+        // Testing can return to InProgress for revisions
+        assert!(service.validate_status_transition(Testing, InProgress, None).is_ok());
+
+        // Human Review can be rejected back to InProgress
+        assert!(service.validate_status_transition(HumanReview, InProgress, None).is_ok());
+
+        // Cancelling from various states
+        assert!(service.validate_status_transition(InProgress, Cancelled, None).is_ok());
+        assert!(service.validate_status_transition(Testing, Cancelled, None).is_ok());
+        assert!(service.validate_status_transition(InReview, Cancelled, None).is_ok());
+        assert!(service.validate_status_transition(HumanReview, Cancelled, None).is_ok());
+
+        // Self-transitions (no-op) are allowed
+        assert!(service.validate_status_transition(InProgress, InProgress, None).is_ok());
+        assert!(service.validate_status_transition(Testing, Testing, None).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_invalid_status_transitions() {
+        let service = create_test_service();
+        use TaskStatus::*;
+
+        // Cannot start from Todo (except to InProgress)
+        assert!(service.validate_status_transition(Todo, Testing, None).is_err());
+        assert!(service.validate_status_transition(Todo, InReview, None).is_err());
+        assert!(service.validate_status_transition(Todo, Done, None).is_err());
+
+        // Cannot go to Todo
+        assert!(service.validate_status_transition(InProgress, Todo, None).is_err());
+        assert!(service.validate_status_transition(Testing, Todo, None).is_err());
+
+        // Only InProgress can enter Testing
+        assert!(service.validate_status_transition(Todo, Testing, None).is_err());
+        assert!(service.validate_status_transition(InReview, Testing, None).is_err());
+
+        // Cannot transition from Done
+        assert!(service.validate_status_transition(Done, InProgress, None).is_err());
+        assert!(service.validate_status_transition(Done, Testing, None).is_err());
+        assert!(service.validate_status_transition(Done, InReview, None).is_err());
+
+        // Cannot transition from Cancelled
+        assert!(service.validate_status_transition(Cancelled, InProgress, None).is_err());
+        assert!(service.validate_status_transition(Cancelled, Testing, None).is_err());
+
+        // InReview cannot go back to InProgress directly
+        assert!(service.validate_status_transition(InReview, InProgress, None).is_err());
+
+        // InReview cannot go back to Testing
+        assert!(service.validate_status_transition(InReview, Testing, None).is_err());
+
+        // Only InReview can enter Human Review
+        assert!(service.validate_status_transition(Testing, HumanReview, None).is_err());
+        assert!(service.validate_status_transition(InProgress, HumanReview, None).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_ai_review_result_enum() {
+        let pass = AIReviewResult::Pass;
+        let fail = AIReviewResult::Fail {
+            issues: vec!["Issue 1".to_string(), "Issue 2".to_string()],
+        };
+        let intervention = AIReviewResult::NeedsIntervention;
+
+        assert_eq!(pass, AIReviewResult::Pass);
+        assert!(matches!(fail, AIReviewResult::Fail { issues } if issues.len() == 2));
+        assert!(matches!(intervention, AIReviewResult::NeedsIntervention));
+    }
+
+    #[tokio::test]
+    async fn test_workflow_config_defaults() {
+        use super::super::config::WorkflowConfig;
+
+        let config = WorkflowConfig::default();
+
+        assert!(!config.enable_human_review);
+        assert_eq!(config.max_ai_review_iterations, 3);
+        assert!(config.testing_requires_manual_exit);
+        assert!(config.auto_start_ai_review);
+        assert!(config.ai_review_prompt_template.is_none());
     }
 }

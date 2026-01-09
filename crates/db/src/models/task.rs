@@ -17,7 +17,9 @@ pub enum TaskStatus {
     #[default]
     Todo,
     InProgress,
+    Testing,
     InReview,
+    HumanReview,
     Done,
     Cancelled,
 }

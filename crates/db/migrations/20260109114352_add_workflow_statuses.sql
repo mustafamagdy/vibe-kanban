@@ -1,24 +1,54 @@
 -- Add new workflow status values to the tasks table
 -- This migration adds 'testing' and 'human_review' statuses and tracking columns
 
--- Drop existing CHECK constraint and recreate with new status values
-ALTER TABLE tasks
-DROP CONSTRAINT IF EXISTS tasks_status_check;
+-- SQLite doesn't support DROP CONSTRAINT, so we recreate the table
+PRAGMA foreign_keys = OFF;
 
-ALTER TABLE tasks
-ADD CONSTRAINT tasks_status_check CHECK (
-    status IN ('todo', 'in_progress', 'testing', 'in_review', 'human_review', 'done', 'cancelled')
+-- Create new table with updated CHECK constraint and new columns
+-- NOTE: Must match existing schema types (BLOB for ids, TEXT for timestamps)
+CREATE TABLE tasks_new (
+    id BLOB NOT NULL PRIMARY KEY,
+    project_id BLOB NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'testing', 'in_review', 'human_review', 'done', 'cancelled')),
+    parent_workspace_id BLOB,
+    shared_task_id BLOB,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    testing_started_at TEXT DEFAULT NULL,
+    ai_review_iterations INTEGER NOT NULL DEFAULT 0,
+    ai_review_feedback TEXT DEFAULT NULL
 );
 
--- Add new columns for workflow tracking
-ALTER TABLE tasks
-ADD COLUMN IF NOT EXISTS testing_started_at TIMESTAMP WITH TIME ZONE;
+-- Copy data from old table - explicitly list all columns
+INSERT INTO tasks_new (id, project_id, title, description, status, parent_workspace_id, shared_task_id, created_at, updated_at, testing_started_at, ai_review_iterations, ai_review_feedback)
+SELECT
+    id,
+    project_id,
+    title,
+    description,
+    CASE
+        WHEN status = 'inprogress' THEN 'in_progress'
+        WHEN status = 'inreview' THEN 'in_review'
+        ELSE status
+    END as status,
+    parent_workspace_id,
+    shared_task_id,
+    created_at,
+    updated_at,
+    NULL,
+    0,
+    NULL
+FROM tasks;
 
-ALTER TABLE tasks
-ADD COLUMN IF NOT EXISTS ai_review_iterations INTEGER NOT NULL DEFAULT 0;
+-- Drop the old table
+DROP TABLE tasks;
 
-ALTER TABLE tasks
-ADD COLUMN IF NOT EXISTS ai_review_feedback JSONB;
+-- Rename new table to original name
+ALTER TABLE tasks_new RENAME TO tasks;
+
+PRAGMA foreign_keys = ON;
 
 -- Create indexes for status queries
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);

@@ -20,7 +20,9 @@ pub const MAX_SHARED_TASK_TEXT_BYTES: usize = 50 * 1024;
 pub enum TaskStatus {
     Todo,
     InProgress,
+    Testing,
     InReview,
+    HumanReview,
     Done,
     Cancelled,
 }

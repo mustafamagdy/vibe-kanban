@@ -5,7 +5,9 @@ pub(super) fn to_remote(status: &TaskStatus) -> RemoteTaskStatus {
     match status {
         TaskStatus::Todo => RemoteTaskStatus::Todo,
         TaskStatus::InProgress => RemoteTaskStatus::InProgress,
+        TaskStatus::Testing => RemoteTaskStatus::InReview, // Map to InReview for remote
         TaskStatus::InReview => RemoteTaskStatus::InReview,
+        TaskStatus::HumanReview => RemoteTaskStatus::InReview, // Map to InReview for remote
         TaskStatus::Done => RemoteTaskStatus::Done,
         TaskStatus::Cancelled => RemoteTaskStatus::Cancelled,
     }
