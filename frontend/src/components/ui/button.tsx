@@ -5,30 +5,71 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed',
+  'inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed rounded-md border',
   {
     variants: {
       variant: {
         default:
-          'text-primary-foreground hover:bg-primary/90 border border-foreground',
+          'bg-primary text-primary-foreground',
         destructive:
-          'border border-destructive text-destructive hover:bg-destructive/10',
+          'bg-destructive text-destructive-foreground',
         outline:
-          'border border-input hover:bg-accent hover:text-accent-foreground',
-        secondary: 'text-secondary-foreground hover:bg-secondary/80 border',
-        ghost: 'hover:text-primary-foreground/50',
-        link: 'hover:underline',
-        icon: 'bg-transparent rounded text-muted-foreground hover:text-foreground',
+          'bg-muted text-foreground',
+        secondary:
+          'bg-secondary text-secondary-foreground',
+        ghost:
+          'bg-transparent text-foreground hover:bg-accent border-transparent',
+        link: 'text-primary underline-offset-4 hover:underline border-transparent',
+        icon: 'bg-transparent text-foreground border-transparent',
       },
       size: {
         default: 'h-10 px-4 py-2',
-        xs: 'h-8 px-2 text-xs',
-        sm: 'h-9 px-3',
-        lg: 'h-11 px-8',
+        xs: 'h-8 px-3 text-xs',
+        sm: 'h-9 px-4',
+        lg: 'h-12 px-6 text-base',
         icon: 'h-10 w-10',
       },
     },
-    compoundVariants: [{ variant: 'icon', class: 'p-0 h-4' }],
+    compoundVariants: [
+      { variant: 'icon', size: 'icon', class: 'p-0 h-4' }
+    ],
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+
+// Neobrutal button variants
+const buttonVariantsNeobrutal = cva(
+  'inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed',
+  {
+    variants: {
+      variant: {
+        default:
+          'neobrutal:bg-primary neobrutal:text-primary-foreground neobrutal:border-3 neobrutal:border-foreground',
+        destructive:
+          'neobrutal:bg-destructive neobrutal:text-destructive-foreground neobrutal:border-3 neobrutal:border-foreground',
+        outline:
+          'neobrutal:bg-muted neobrutal:text-foreground neobrutal:border-3 neobrutal:border-foreground',
+        secondary:
+          'neobrutal:bg-secondary neobrutal:text-secondary-foreground neobrutal:border-3 neobrutal:border-foreground',
+        ghost:
+          'neobrutal:bg-transparent neobrutal:text-foreground neobrutal:border-3 neobrutal:border-transparent neobrutal:hover:bg-accent',
+        link: 'neobrutal:text-primary neobrutal:underline-offset-4 neobrutal:hover:underline neobrutal:border-transparent',
+        icon: 'neobrutal:bg-transparent neobrutal:text-foreground neobrutal:border-3 neobrutal:border-transparent',
+      },
+      size: {
+        default: 'h-10 px-4 py-2',
+        xs: 'h-8 px-3 text-xs',
+        sm: 'h-9 px-4',
+        lg: 'h-12 px-6 text-base',
+        icon: 'h-10 w-10',
+      },
+    },
+    compoundVariants: [
+      { variant: 'icon', size: 'icon', class: 'neobrutal:p-0 neobrutal:h-4' }
+    ],
     defaultVariants: {
       variant: 'default',
       size: 'default',
@@ -47,7 +88,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : 'button';
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(
+          buttonVariants({ variant, size, className }),
+          buttonVariantsNeobrutal({ variant, size, className })
+        )}
         ref={ref}
         {...props}
       />

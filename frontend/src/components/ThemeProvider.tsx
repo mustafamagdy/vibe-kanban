@@ -33,7 +33,19 @@ export function ThemeProvider({
   useEffect(() => {
     const root = window.document.documentElement;
 
-    root.classList.remove('light', 'dark');
+    // Remove all theme classes
+    root.classList.remove('light', 'dark', 'neobrutal');
+
+    if (theme === ThemeMode.NEO_BRUTAL) {
+      // NeoBrutal theme - respects system preference for light/dark
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+        .matches
+        ? 'dark'
+        : 'light';
+
+      root.classList.add('neobrutal', systemTheme);
+      return;
+    }
 
     if (theme === ThemeMode.SYSTEM) {
       const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
@@ -45,6 +57,7 @@ export function ThemeProvider({
       return;
     }
 
+    // Light or Dark
     root.classList.add(theme.toLowerCase());
   }, [theme]);
 

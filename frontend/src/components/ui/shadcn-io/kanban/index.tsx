@@ -112,9 +112,11 @@ export const KanbanCard = ({
   return (
     <Card
       className={cn(
-        'p-3 outline-none border-b flex-col space-y-2',
+        'p-3 outline-none flex-col space-y-2',
+        'border rounded-lg',
+        'neobrutal:border-3 neobrutal:border-foreground neobrutal:shadow-none',
         isDragging && 'cursor-grabbing',
-        isOpen && 'ring-2 ring-secondary-foreground ring-inset',
+        isOpen && 'ring-2 ring-ring ring-inset',
         className
       )}
       {...listeners}
@@ -165,28 +167,27 @@ export const KanbanHeader = (props: KanbanHeaderProps) => {
   return (
     <Card
       className={cn(
-        'sticky top-0 z-20 flex shrink-0 items-center gap-2 p-3 border-b border-dashed flex gap-2',
+        'sticky top-0 z-20 flex shrink-0 items-center gap-2 p-3 border rounded-lg',
+        'neobrutal:border-3 neobrutal:border-foreground',
         'bg-background',
         props.className
       )}
-      style={{
-        backgroundImage: `linear-gradient(hsl(var(${props.color}) / 0.03), hsl(var(${props.color}) / 0.03))`,
-      }}
     >
       <span className="flex-1 flex items-center gap-2">
         <div
-          className="h-2 w-2 rounded-full"
+          className="h-3 w-3"
           style={{ backgroundColor: `hsl(var(${props.color}))` }}
         />
 
-        <p className="m-0 text-sm">{props.name}</p>
+        <p className="m-0 font-semibold text-sm">{props.name}</p>
       </span>
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant="ghost"
-              className="m-0 p-0 h-0 text-foreground/50 hover:text-foreground"
+              variant="icon"
+              size="icon"
+              className="h-8 w-8 text-foreground/70 hover:text-foreground"
               onClick={props.onAddTask}
               aria-label={t('actions.addTask')}
             >
@@ -285,7 +286,8 @@ export const KanbanProvider = ({
     >
       <div
         className={cn(
-          'inline-grid grid-flow-col auto-cols-[minmax(200px,400px)] divide-x border-x items-stretch min-h-full',
+          'inline-grid grid-flow-col auto-cols-[minmax(200px,400px)] divide-x divide-border border-x items-stretch min-h-full bg-muted',
+          'neobrutal:divide-foreground neobrutal:border-foreground neobrutal:divide-x-3 neobrutal:border-x-3',
           className
         )}
       >

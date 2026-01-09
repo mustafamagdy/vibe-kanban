@@ -25,6 +25,7 @@ pub enum ThemeMode {
     Light,
     Dark,
     System,
+    NeoBrutal,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]

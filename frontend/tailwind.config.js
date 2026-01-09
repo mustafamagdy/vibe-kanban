@@ -119,8 +119,19 @@ module.exports = {
       },
       borderRadius: {
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        md: "var(--radius)",
+        sm: "var(--radius)",
+        DEFAULT: "var(--radius)",
+      },
+      boxShadow: {
+        'brutal': '4px 4px 0px 0px hsl(var(--primary))',
+        'brutal-sm': '2px 2px 0px 0px hsl(var(--primary))',
+        'brutal-lg': '6px 6px 0px 0px hsl(var(--primary))',
+        'brutal-accent': '4px 4px 0px 0px hsl(var(--primary))',
+        'brutal-hover': '2px 2px 0px 0px hsl(var(--primary))',
+      },
+      borderWidth: {
+        '3': '3px',
       },
       fontFamily: {
         'chivo-mono': ['Chivo Mono', 'Noto Emoji', 'monospace'],
