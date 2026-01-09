@@ -285,26 +285,27 @@ export function Navbar() {
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
-                  {projectHasDevScript && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9"
-                            onClick={handleStartDevServer}
-                            aria-label={t('attempt.actions.startDevServer')}
-                          >
-                            <Play className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          {t('attempt.actions.startDevServer')}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={handleStartDevServer}
+                          disabled={!projectHasDevScript}
+                          aria-label={t('attempt.actions.startDevServer')}
+                        >
+                          <Play className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        {projectHasDevScript
+                          ? t('attempt.actions.startDevServer')
+                          : t('attempt.devScriptMissingTooltip')}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <NavDivider />
               </>
