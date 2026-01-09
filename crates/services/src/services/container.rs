@@ -18,7 +18,7 @@ use db::{
         execution_process_repo_state::{
             CreateExecutionProcessRepoState, ExecutionProcessRepoState,
         },
-        project::{Project, UpdateProject},
+        project::{Project, ProjectWorkflowConfig as DbProjectWorkflowConfig, UpdateProject},
         project_repo::{ProjectRepo, ProjectRepoWithName},
         repo::Repo,
         session::{CreateSession, Session, SessionError},
@@ -1615,13 +1615,21 @@ pub trait ContainerService {
             .ok_or_else(|| ContainerError::Other(anyhow!("Project not found: {}", project_id)))?;
 
         let db_config = project.get_workflow_config();
-        Ok(super::config::ProjectWorkflowConfig {
+        Ok(db_config.into())
+    }
+}
+
+/// Convert from db::ProjectWorkflowConfig to services::config::ProjectWorkflowConfig
+/// Both types have identical fields, avoiding circular dependency
+impl From<DbProjectWorkflowConfig> for super::config::ProjectWorkflowConfig {
+    fn from(db_config: DbProjectWorkflowConfig) -> Self {
+        Self {
             enable_human_review: db_config.enable_human_review,
             max_ai_review_iterations: db_config.max_ai_review_iterations,
             testing_requires_manual_exit: db_config.testing_requires_manual_exit,
             auto_start_ai_review: db_config.auto_start_ai_review,
             ai_review_prompt_template: db_config.ai_review_prompt_template,
-        })
+        }
     }
 }
 
@@ -1743,15 +1751,6 @@ mod status_transition_tests {
     async fn test_valid_status_transitions() {
         let service = create_test_service();
         use TaskStatus::*;
-
-        // Default config (Human Review disabled, Testing requires manual exit)
-        let default_config = Some(super::super::config::ProjectWorkflowConfig {
-            enable_human_review: false,
-            max_ai_review_iterations: 3,
-            testing_requires_manual_exit: true,
-            auto_start_ai_review: true,
-            ai_review_prompt_template: None,
-        });
 
         // Config with Human Review enabled
         let human_review_enabled = Some(super::super::config::ProjectWorkflowConfig {
