@@ -27,10 +27,10 @@ description: Task list template for feature implementation
 
 **Purpose**: Database migration and configuration foundation
 
-- [ ] T001 Create SQLx migration for workflow statuses in `crates/db/migrations/`
-- [ ] T002 Create Config v9 with WorkflowConfig in `crates/services/src/services/config/versions/v9.rs`
-- [ ] T003 Update config/mod.rs to add v9 migration path in `crates/services/src/services/config/mod.rs`
-- [ ] T004 Add database indexes for status queries per data-model.md
+- [x] T001 Create SQLx migration for workflow statuses in `crates/db/migrations/`
+- [x] T002 Create Config v9 with WorkflowConfig in `crates/services/src/services/config/versions/v9.rs`
+- [x] T003 Update config/mod.rs to add v9 migration path in `crates/services/src/services/config/mod.rs`
+- [x] T004 Add database indexes for status queries per data-model.md
 
 ---
 
