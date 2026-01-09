@@ -75,7 +75,7 @@ export function BaseAgentField({
 
   // Handler for type selection change
   const handleTypeChange = useCallback((newType: string) => {
-    setSelectedType(newType);
+    setSelectedType(newType as typeof AGENT_TYPES[number]['value']);
   }, []);
 
   // Handler for nested field changes - updates formData with new values
@@ -92,7 +92,7 @@ export function BaseAgentField({
       [selectedType]: selectedConfig,
     };
 
-    onChange(newFormData, undefined);
+    onChange(newFormData, []);
   }, [formData, selectedType, onChange]);
 
   const isDisabled = disabled || readonly;

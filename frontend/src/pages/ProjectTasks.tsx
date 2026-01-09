@@ -78,7 +78,9 @@ type Task = TaskWithAttemptStatus;
 const TASK_STATUSES = [
   'todo',
   'inprogress',
+  'testing',
   'inreview',
+  'humanreview',
   'done',
   'cancelled',
 ] as const;
@@ -364,7 +366,9 @@ export function ProjectTasks() {
     const columns: Record<TaskStatus, KanbanColumnItem[]> = {
       todo: [],
       inprogress: [],
+      testing: [],
       inreview: [],
+      humanreview: [],
       done: [],
       cancelled: [],
     };
@@ -456,7 +460,9 @@ export function ProjectTasks() {
     const map: Record<TaskStatus, Task[]> = {
       todo: [],
       inprogress: [],
+      testing: [],
       inreview: [],
+      humanreview: [],
       done: [],
       cancelled: [],
     };

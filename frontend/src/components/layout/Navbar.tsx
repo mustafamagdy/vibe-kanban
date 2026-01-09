@@ -167,9 +167,14 @@ export function Navbar() {
         );
       } else {
         // No attempts, create a task with default attempt then start dev server
-        const task = await tasksApi.create(projectId, {
+        const task = await tasksApi.create({
+          project_id: projectId,
           title: 'Dev server task',
           description: 'Auto-generated task for dev server',
+          status: null,
+          parent_workspace_id: null,
+          image_ids: null,
+          shared_task_id: null,
         });
 
         const attempt = await attemptsApi.create({

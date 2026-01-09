@@ -120,7 +120,9 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
     const byStatus: Record<TaskStatus, TaskWithAttemptStatus[]> = {
       todo: [],
       inprogress: [],
+      testing: [],
       inreview: [],
+      humanreview: [],
       done: [],
       cancelled: [],
     };
@@ -150,7 +152,9 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
     const grouped: Record<TaskStatus, SharedTaskRecord[]> = {
       todo: [],
       inprogress: [],
+      testing: [],
       inreview: [],
+      humanreview: [],
       done: [],
       cancelled: [],
     };

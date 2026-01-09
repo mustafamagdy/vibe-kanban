@@ -261,10 +261,19 @@ pub async fn update_task(
         Some(s) => Some(s),                     // Non-empty string = update description
         None => existing_task.description,      // Field omitted = keep existing
     };
-    let status = payload.status.unwrap_or(existing_task.status);
+    let original_status = existing_task.status;
+    let status = payload.status.clone().unwrap_or(original_status.clone());
     let parent_workspace_id = payload
         .parent_workspace_id
         .or(existing_task.parent_workspace_id);
+
+    // Validate status transition if status is being changed
+    if payload.status.is_some() && payload.status.as_ref() != Some(&original_status) {
+        let container = deployment.container();
+        container
+            .validate_status_transition(original_status, status.clone(), None)
+            .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    }
 
     let task = Task::update(
         &deployment.db().pool,
@@ -460,11 +469,26 @@ pub async fn share_task(
     })))
 }
 
+/// Complete the Testing phase and transition to AI Review
+pub async fn complete_testing(
+    Extension(task): Extension<Task>,
+    State(deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<db::models::task::TaskStatus>>, ApiError> {
+    let share_publisher = deployment.share_publisher().ok();
+    let new_status = deployment
+        .container()
+        .complete_testing(task.id, share_publisher.as_ref())
+        .await?;
+
+    Ok(ResponseJson(ApiResponse::success(new_status)))
+}
+
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     let task_actions_router = Router::new()
         .route("/", put(update_task))
         .route("/", delete(delete_task))
-        .route("/share", post(share_task));
+        .route("/share", post(share_task))
+        .route("/testing/complete", post(complete_testing));
 
     let task_id_router = Router::new()
         .route("/", get(get_task))

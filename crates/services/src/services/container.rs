@@ -214,7 +214,8 @@ pub trait ContainerService {
         Ok(true)
     }
 
-    /// Finalize task execution by updating status to InReview (or Done if conflicts resolved) and sending notifications
+    /// Finalize task execution by updating status to Testing (new workflow phase) and sending notifications
+    /// The workflow is: Todo → InProgress → Testing → AI Review → Human Review (optional) → Done
     async fn finalize_task(
         &self,
         share_publisher: Option<&SharePublisher>,
@@ -225,14 +226,16 @@ pub trait ContainerService {
             return;
         }
 
-        // Determine final status: Done if conflicts were resolved, otherwise InReview
+        // Determine final status: Route to Testing phase after execution completes
+        // The Testing phase serves as a gate before AI Review
         let (final_status, status_message) = if matches!(ctx.execution_process.status, ExecutionProcessStatus::Completed) {
             match self.check_conflicts_resolved(ctx).await {
-                Ok(true) => (TaskStatus::Done, "conflicts resolved"),
-                _ => (TaskStatus::InReview, "in review"),
+                Ok(true) => (TaskStatus::Testing, "ready for testing"),
+                _ => (TaskStatus::Testing, "ready for testing"),
             }
         } else {
-            (TaskStatus::InReview, "in review")
+            // Failed executions also go to Testing for review
+            (TaskStatus::Testing, "ready for testing")
         };
 
         let status_for_log = final_status.clone();
@@ -257,23 +260,16 @@ pub trait ContainerService {
             }
         }
 
-        let title = format!("Task Complete: {}", ctx.task.title);
+        let title = format!("Task Ready for Testing: {}", ctx.task.title);
         let message = match ctx.execution_process.status {
             ExecutionProcessStatus::Completed => {
-                if status_for_log == TaskStatus::Done {
-                    format!(
-                        "✅ '{}' completed - conflicts resolved!\nBranch: {:?}\nExecutor: {:?}",
-                        ctx.task.title, ctx.workspace.branch, ctx.session.executor
-                    )
-                } else {
-                    format!(
-                        "✅ '{}' completed successfully\nBranch: {:?}\nExecutor: {:?}",
-                        ctx.task.title, ctx.workspace.branch, ctx.session.executor
-                    )
-                }
+                format!(
+                    "✅ '{}' completed and ready for testing\nBranch: {:?}\nExecutor: {:?}",
+                    ctx.task.title, ctx.workspace.branch, ctx.session.executor
+                )
             }
             ExecutionProcessStatus::Failed => format!(
-                "❌ '{}' execution failed\nBranch: {:?}\nExecutor: {:?}",
+                "⚠️ '{}' execution completed with issues, ready for testing\nBranch: {:?}\nExecutor: {:?}",
                 ctx.task.title, ctx.workspace.branch, ctx.session.executor
             ),
             _ => {
@@ -1319,7 +1315,6 @@ pub trait ContainerService {
             (Testing, InProgress) => Ok(()), // Return to InProgress for revisions
             (Testing, Done) => Ok(()),
             (Testing, Cancelled) => Ok(()),
-            (InProgress, InReview) => Ok(()),
             (InReview, HumanReview) => Ok(()),
             (InReview, Done) => Ok(()),
             (InReview, Cancelled) => Ok(()),

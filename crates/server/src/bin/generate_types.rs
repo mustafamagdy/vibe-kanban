@@ -141,6 +141,7 @@ fn generate_types_content() -> String {
         services::services::filesystem::DirectoryEntry::decl(),
         services::services::filesystem::DirectoryListResponse::decl(),
         services::services::config::Config::decl(),
+        services::services::config::WorkflowConfig::decl(),
         services::services::config::NotificationConfig::decl(),
         services::services::config::ThemeMode::decl(),
         services::services::config::EditorConfig::decl(),

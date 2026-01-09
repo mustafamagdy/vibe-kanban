@@ -1,5 +1,6 @@
 -- Add new workflow status values to the tasks table
--- This migration adds 'testing' and 'human_review' statuses and tracking columns
+-- This migration adds 'testing' and 'humanreview' statuses and tracking columns
+-- Status values use Rust serialization format: todo, inprogress, testing, inreview, humanreview, done, cancelled
 
 -- SQLite doesn't support DROP CONSTRAINT, so we recreate the table
 PRAGMA foreign_keys = OFF;
@@ -11,7 +12,7 @@ CREATE TABLE tasks_new (
     project_id BLOB NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
-    status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'testing', 'in_review', 'human_review', 'done', 'cancelled')),
+    status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'inprogress', 'testing', 'inreview', 'humanreview', 'done', 'cancelled')),
     parent_workspace_id BLOB,
     shared_task_id BLOB,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
@@ -28,11 +29,7 @@ SELECT
     project_id,
     title,
     description,
-    CASE
-        WHEN status = 'inprogress' THEN 'in_progress'
-        WHEN status = 'inreview' THEN 'in_review'
-        ELSE status
-    END as status,
+    status,
     parent_workspace_id,
     shared_task_id,
     created_at,

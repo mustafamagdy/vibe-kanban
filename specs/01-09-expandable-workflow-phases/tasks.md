@@ -61,18 +61,18 @@ description: Task list template for feature implementation
 
 ### Backend - User Story 1
 
-- [ ] T020 [P] [US1] Add PATCH /tasks/:id/status endpoint for testing status in `crates/server/src/routes/tasks.rs`
-- [ ] T021 [P] [US1] Add POST /tasks/:id/testing/complete endpoint in `crates/server/src/routes/tasks.rs`
-- [ ] T022 [US1] Update finalize_task method to route to Testing instead of Done in `crates/services/src/services/container.rs`
+- [x] T020 [P] [US1] Add PATCH /tasks/:id/status endpoint for testing status in `crates/server/src/routes/tasks.rs`
+- [x] T021 [P] [US1] Add POST /tasks/:id/testing/complete endpoint in `crates/server/src/routes/tasks.rs`
+- [x] T022 [US1] Update finalize_task method to route to Testing instead of Done in `crates/services/src/services/container.rs`
 
 ### Frontend - User Story 1
 
-- [ ] T030 [P] [US1] Add 'testing' to TASK_STATUSES array in `frontend/src/pages/ProjectTasks.tsx`
-- [ ] T031 [P] [US1] Add 'humanreview' to TASK_STATUSES array in `frontend/src/pages/ProjectTasks.tsx`
-- [ ] T032 [US1] Add status label for 'testing' in `frontend/src/utils/statusLabels.ts`
-- [ ] T033 [US1] Add status label for 'humanreview' in `frontend/src/utils/statusLabels.ts`
-- [ ] T034 [US1] Add Testing column to kanban board in `frontend/src/pages/ProjectTasks.tsx`
-- [ ] T035 [US1] Update drag-and-drop to support Testing status transitions in `frontend/src/pages/ProjectTasks.tsx`
+- [x] T030 [P] [US1] Add 'testing' to TASK_STATUSES array in `frontend/src/pages/ProjectTasks.tsx`
+- [x] T031 [P] [US1] Add 'humanreview' to TASK_STATUSES array in `frontend/src/pages/ProjectTasks.tsx`
+- [x] T032 [US1] Add status label for 'testing' in `frontend/src/utils/statusLabels.ts`
+- [x] T033 [US1] Add status label for 'humanreview' in `frontend/src/utils/statusLabels.ts`
+- [x] T034 [US1] Add Testing column to kanban board in `frontend/src/pages/ProjectTasks.tsx`
+- [x] T035 [US1] Update drag-and-drop to support Testing status transitions in `frontend/src/pages/ProjectTasks.tsx`
 
 **Checkpoint**: User Story 1 complete - tasks can enter Testing and exit to AI Review
 
