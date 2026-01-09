@@ -182,6 +182,10 @@ export type CreateRemoteProjectRequest = { organization_id: string, name: string
 
 export type LinkToExistingRequest = { remote_project_id: string, };
 
+export type UpdateWorkflowConfigRequest = { enable_human_review: boolean | null, max_ai_review_iterations: number | null, testing_requires_manual_exit: boolean | null, auto_start_ai_review: boolean | null, ai_review_prompt_template: string | null | null, };
+
+export type WorkflowConfigResponse = { enable_human_review: boolean, max_ai_review_iterations: number, testing_requires_manual_exit: boolean, auto_start_ai_review: boolean, ai_review_prompt_template: string | null, };
+
 export type RegisterRepoRequest = { path: string, display_name: string | null, };
 
 export type InitRepoRequest = { parent_path: string, folder_name: string, };

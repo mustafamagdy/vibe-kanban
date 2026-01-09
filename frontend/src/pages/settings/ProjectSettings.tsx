@@ -32,6 +32,7 @@ import { RepoPickerDialog } from '@/components/dialogs/shared/RepoPickerDialog';
 import { projectsApi } from '@/lib/api';
 import { repoBranchKeys } from '@/hooks/useRepoBranches';
 import type { Project, ProjectRepo, Repo, UpdateProject } from 'shared/types';
+import { WorkflowSettings } from './WorkflowSettings';
 
 interface ProjectFormState {
   name: string;
@@ -929,6 +930,11 @@ export function ProjectSettings() {
               )}
             </CardContent>
           </Card>
+
+          {/* Workflow Settings Section */}
+          {selectedProjectId && (
+            <WorkflowSettings projectId={selectedProjectId} />
+          )}
 
           {/* Sticky Save Button for Project Name */}
           {hasUnsavedProjectChanges && (

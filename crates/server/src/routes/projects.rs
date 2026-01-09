@@ -17,6 +17,7 @@ use db::models::{
     project_repo::{CreateProjectRepo, ProjectRepo, UpdateProjectRepo},
     repo::Repo,
 };
+use serde::Serialize;
 use deployment::Deployment;
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use serde::Deserialize;
@@ -582,6 +583,113 @@ pub async fn update_project_repository(
     }
 }
 
+/// Request body for updating workflow configuration
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct UpdateWorkflowConfigRequest {
+    #[serde(default)]
+    pub enable_human_review: Option<bool>,
+
+    #[serde(default)]
+    pub max_ai_review_iterations: Option<u32>,
+
+    #[serde(default)]
+    pub testing_requires_manual_exit: Option<bool>,
+
+    #[serde(default)]
+    pub auto_start_ai_review: Option<bool>,
+
+    #[serde(default)]
+    pub ai_review_prompt_template: Option<Option<String>>,
+}
+
+/// Response for workflow configuration
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WorkflowConfigResponse {
+    pub enable_human_review: bool,
+    pub max_ai_review_iterations: u32,
+    pub testing_requires_manual_exit: bool,
+    pub auto_start_ai_review: bool,
+    pub ai_review_prompt_template: Option<String>,
+}
+
+/// GET /projects/:id/workflow-config
+/// Returns the workflow configuration for a project
+pub async fn get_workflow_config(
+    Extension(project): Extension<Project>,
+) -> Result<ResponseJson<ApiResponse<WorkflowConfigResponse>>, ApiError> {
+    let config = project.get_workflow_config();
+    Ok(ResponseJson(ApiResponse::success(WorkflowConfigResponse {
+        enable_human_review: config.enable_human_review,
+        max_ai_review_iterations: config.max_ai_review_iterations,
+        testing_requires_manual_exit: config.testing_requires_manual_exit,
+        auto_start_ai_review: config.auto_start_ai_review,
+        ai_review_prompt_template: config.ai_review_prompt_template,
+    })))
+}
+
+/// PATCH /projects/:id/workflow-config
+/// Updates the workflow configuration for a project
+pub async fn update_workflow_config(
+    Extension(project): Extension<Project>,
+    State(deployment): State<DeploymentImpl>,
+    Json(payload): Json<UpdateWorkflowConfigRequest>,
+) -> Result<ResponseJson<ApiResponse<WorkflowConfigResponse>>, ApiError> {
+    // Get existing config
+    let mut config = project.get_workflow_config();
+
+    // Apply updates from payload
+    if let Some(enable_human_review) = payload.enable_human_review {
+        config.enable_human_review = enable_human_review;
+    }
+    if let Some(max_ai_review_iterations) = payload.max_ai_review_iterations {
+        // Validate: max_ai_review_iterations must be at least 1
+        if max_ai_review_iterations == 0 {
+            return Err(ApiError::BadRequest(
+                "max_ai_review_iterations must be at least 1".to_string(),
+            ));
+        }
+        config.max_ai_review_iterations = max_ai_review_iterations;
+    }
+    if let Some(testing_requires_manual_exit) = payload.testing_requires_manual_exit {
+        config.testing_requires_manual_exit = testing_requires_manual_exit;
+    }
+    if let Some(auto_start_ai_review) = payload.auto_start_ai_review {
+        config.auto_start_ai_review = auto_start_ai_review;
+    }
+    if let Some(ai_review_prompt_template) = payload.ai_review_prompt_template {
+        config.ai_review_prompt_template = ai_review_prompt_template;
+    }
+
+    // Serialize config to JSON
+    let workflow_config_json = serde_json::to_string(&config).map_err(|e| {
+        ApiError::BadRequest(format!("Failed to serialize workflow config: {}", e))
+    })?;
+
+    // Update in database
+    let updated_project = Project::update_workflow_config(
+        &deployment.db().pool,
+        project.id,
+        Some(workflow_config_json),
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to update workflow config: {}", e);
+        ApiError::Database(e)
+    })?;
+
+    // Return the updated config
+    let updated_config = updated_project.get_workflow_config();
+    Ok(ResponseJson(ApiResponse::success(WorkflowConfigResponse {
+        enable_human_review: updated_config.enable_human_review,
+        max_ai_review_iterations: updated_config.max_ai_review_iterations,
+        testing_requires_manual_exit: updated_config.testing_requires_manual_exit,
+        auto_start_ai_review: updated_config.auto_start_ai_review,
+        ai_review_prompt_template: updated_config.ai_review_prompt_template,
+    })))
+}
+
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     let project_id_router = Router::new()
         .route(
@@ -599,6 +707,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route(
             "/repositories",
             get(get_project_repositories).post(add_project_repository),
+        )
+        .route(
+            "/workflow-config",
+            get(get_workflow_config).patch(update_workflow_config),
         )
         .layer(from_fn_with_state(
             deployment.clone(),
@@ -620,4 +732,186 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         "/remote-projects/{remote_project_id}",
         get(get_remote_project_by_id),
     )
+}
+
+#[cfg(test)]
+mod workflow_config_tests {
+    use super::*;
+    use db::models::project::ProjectWorkflowConfig;
+
+    #[test]
+    fn test_update_workflow_config_request_defaults() {
+        let req = UpdateWorkflowConfigRequest {
+            enable_human_review: None,
+            max_ai_review_iterations: None,
+            testing_requires_manual_exit: None,
+            auto_start_ai_review: None,
+            ai_review_prompt_template: None,
+        };
+
+        assert!(req.enable_human_review.is_none());
+        assert!(req.max_ai_review_iterations.is_none());
+        assert!(req.testing_requires_manual_exit.is_none());
+        assert!(req.auto_start_ai_review.is_none());
+        assert!(req.ai_review_prompt_template.is_none());
+    }
+
+    #[test]
+    fn test_project_workflow_config_defaults() {
+        // Test that Default::default() sets all fields to Rust defaults
+        // Note: serde defaults (from #[serde(default = "...")]) only apply during deserialization
+        let config = ProjectWorkflowConfig::default();
+
+        assert!(!config.enable_human_review);
+        assert_eq!(config.max_ai_review_iterations, 0); // Rust default for u32
+        assert!(!config.testing_requires_manual_exit); // Rust default for bool
+        assert!(!config.auto_start_ai_review); // Rust default for bool
+        assert!(config.ai_review_prompt_template.is_none());
+    }
+
+    #[test]
+    fn test_project_workflow_config_serde_defaults() {
+        // Test that serde defaults apply during deserialization
+        let json = "{}";
+        let config: ProjectWorkflowConfig = serde_json::from_str(json).expect("should deserialize");
+
+        // These values come from #[serde(default = "...")] attributes
+        assert!(!config.enable_human_review);
+        assert_eq!(config.max_ai_review_iterations, 3);
+        assert!(config.testing_requires_manual_exit);
+        assert!(config.auto_start_ai_review);
+        assert!(config.ai_review_prompt_template.is_none());
+    }
+
+    #[test]
+    fn test_project_workflow_config_serialization() {
+        let config = ProjectWorkflowConfig {
+            enable_human_review: true,
+            max_ai_review_iterations: 5,
+            testing_requires_manual_exit: false,
+            auto_start_ai_review: true,
+            ai_review_prompt_template: Some("Review the code carefully".to_string()),
+        };
+
+        let json = serde_json::to_string(&config).expect("should serialize");
+        let deserialized: ProjectWorkflowConfig =
+            serde_json::from_str(&json).expect("should deserialize");
+
+        assert_eq!(deserialized.enable_human_review, true);
+        assert_eq!(deserialized.max_ai_review_iterations, 5);
+        assert_eq!(deserialized.testing_requires_manual_exit, false);
+        assert_eq!(deserialized.auto_start_ai_review, true);
+        assert_eq!(
+            deserialized.ai_review_prompt_template,
+            Some("Review the code carefully".to_string())
+        );
+    }
+
+    #[test]
+    fn test_workflow_config_response_serialization() {
+        let response = WorkflowConfigResponse {
+            enable_human_review: true,
+            max_ai_review_iterations: 3,
+            testing_requires_manual_exit: true,
+            auto_start_ai_review: false,
+            ai_review_prompt_template: None,
+        };
+
+        let json = serde_json::to_string(&response).expect("should serialize");
+        let deserialized: WorkflowConfigResponse =
+            serde_json::from_str(&json).expect("should deserialize");
+
+        assert_eq!(deserialized.enable_human_review, true);
+        assert_eq!(deserialized.max_ai_review_iterations, 3);
+        assert_eq!(deserialized.testing_requires_manual_exit, true);
+        assert_eq!(deserialized.auto_start_ai_review, false);
+        assert!(deserialized.ai_review_prompt_template.is_none());
+    }
+
+    #[test]
+    fn test_workflow_config_response_with_template() {
+        let response = WorkflowConfigResponse {
+            enable_human_review: false,
+            max_ai_review_iterations: 1,
+            testing_requires_manual_exit: true,
+            auto_start_ai_review: true,
+            ai_review_prompt_template: Some("Custom template".to_string()),
+        };
+
+        let json = serde_json::to_string(&response).expect("should serialize");
+        let deserialized: WorkflowConfigResponse =
+            serde_json::from_str(&json).expect("should deserialize");
+
+        assert_eq!(
+            deserialized.ai_review_prompt_template,
+            Some("Custom template".to_string())
+        );
+    }
+
+    #[test]
+    fn test_max_ai_review_iterations_validation() {
+        // Valid values
+        assert!(is_valid_max_iterations(1));
+        assert!(is_valid_max_iterations(3));
+        assert!(is_valid_max_iterations(10));
+        assert!(is_valid_max_iterations(50));
+
+        // Invalid values (0 is not allowed, u32::MAX is too high)
+        assert!(!is_valid_max_iterations(0));
+        assert!(!is_valid_max_iterations(u32::MAX));
+    }
+
+    /// Helper function to validate max_ai_review_iterations
+    fn is_valid_max_iterations(value: u32) -> bool {
+        value >= 1 && value <= 50
+    }
+
+    #[test]
+    fn test_update_request_partial_updates() {
+        // Simulate partial update behavior
+        let original_config = ProjectWorkflowConfig {
+            enable_human_review: false,
+            max_ai_review_iterations: 3,
+            testing_requires_manual_exit: true,
+            auto_start_ai_review: true,
+            ai_review_prompt_template: None,
+        };
+
+        // Only update enable_human_review
+        let update = UpdateWorkflowConfigRequest {
+            enable_human_review: Some(true),
+            max_ai_review_iterations: None,
+            testing_requires_manual_exit: None,
+            auto_start_ai_review: None,
+            ai_review_prompt_template: None,
+        };
+
+        let merged = merge_config(original_config.clone(), update);
+        assert_eq!(merged.enable_human_review, true);
+        assert_eq!(merged.max_ai_review_iterations, 3); // Unchanged
+        assert_eq!(merged.testing_requires_manual_exit, true); // Unchanged
+    }
+
+    /// Helper to merge update request with existing config
+    fn merge_config(
+        mut existing: ProjectWorkflowConfig,
+        update: UpdateWorkflowConfigRequest,
+    ) -> ProjectWorkflowConfig {
+        if let Some(enable_human_review) = update.enable_human_review {
+            existing.enable_human_review = enable_human_review;
+        }
+        if let Some(max_ai_review_iterations) = update.max_ai_review_iterations {
+            existing.max_ai_review_iterations = max_ai_review_iterations;
+        }
+        if let Some(testing_requires_manual_exit) = update.testing_requires_manual_exit {
+            existing.testing_requires_manual_exit = testing_requires_manual_exit;
+        }
+        if let Some(auto_start_ai_review) = update.auto_start_ai_review {
+            existing.auto_start_ai_review = auto_start_ai_review;
+        }
+        if let Some(ai_review_prompt_template) = update.ai_review_prompt_template {
+            existing.ai_review_prompt_template = ai_review_prompt_template;
+        }
+        existing
+    }
 }

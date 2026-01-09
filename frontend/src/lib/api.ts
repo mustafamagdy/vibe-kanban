@@ -89,6 +89,8 @@ import {
   AbortConflictsRequest,
   Session,
   Workspace,
+  UpdateWorkflowConfigRequest,
+  WorkflowConfigResponse,
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
@@ -382,6 +384,27 @@ export const projectsApi = {
       }
     );
     return handleApiResponse<ProjectRepo>(response);
+  },
+
+  getWorkflowConfig: async (projectId: string): Promise<WorkflowConfigResponse> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/workflow-config`
+    );
+    return handleApiResponse<WorkflowConfigResponse>(response);
+  },
+
+  updateWorkflowConfig: async (
+    projectId: string,
+    data: UpdateWorkflowConfigRequest
+  ): Promise<WorkflowConfigResponse> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/workflow-config`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<WorkflowConfigResponse>(response);
   },
 };
 
