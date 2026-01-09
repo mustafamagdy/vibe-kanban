@@ -437,7 +437,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   placeholder={t('taskFormDialog.titlePlaceholder')}
-                  className="text-lg font-semibold placeholder:text-muted-foreground/60 border-none p-0"
+                  className="text-lg font-semibold placeholder:text-muted-foreground/60 border-none bg-transparent p-0 h-auto shadow-none focus-visible:ring-0 rounded-none"
                   disabled={isSubmitting}
                   autoFocus
                 />

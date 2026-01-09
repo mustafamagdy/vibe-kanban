@@ -19,6 +19,7 @@ import {
   Plus,
   LogOut,
   LogIn,
+  Play,
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { SearchBar } from '@/components/SearchBar';
@@ -40,6 +41,10 @@ import {
 import { OAuthDialog } from '@/components/dialogs/global/OAuthDialog';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { oauthApi } from '@/lib/api';
+import { attemptsApi, tasksApi } from '@/lib/api';
+import { paths } from '@/lib/paths';
+import { useNavigate } from 'react-router-dom';
+import { useTaskAttempts } from '@/hooks/useTaskAttempts';
 
 const INTERNAL_NAV = [{ label: 'Projects', icon: FolderOpen, to: '/projects' }];
 
@@ -74,11 +79,12 @@ function NavDivider() {
 export function Navbar() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { projectId, project } = useProject();
   const { query, setQuery, active, clear, registerInputRef } = useSearch();
   const handleOpenInEditor = useOpenProjectInEditor(project || null);
   const { data: onlineCount } = useDiscordOnlineCount();
-  const { loginStatus, reloadSystem } = useUserSystem();
+  const { loginStatus, reloadSystem, config } = useUserSystem();
 
   const { data: repos } = useProjectRepos(projectId);
   const isSingleRepoProject = repos?.length === 1;
@@ -92,6 +98,13 @@ export function Navbar() {
   const { t } = useTranslation(['tasks', 'common']);
   // Navbar is global, but the share tasks toggle only makes sense on the tasks route
   const isTasksRoute = /^\/projects\/[^/]+\/tasks/.test(location.pathname);
+
+  // Get attempts for tasks to find one with existing attempt
+  const { data: attempts = [] } = useTaskAttempts(
+    isTasksRoute ? undefined : undefined,
+    { enabled: false }
+  );
+
   const showSharedTasks = searchParams.get('shared') !== 'off';
   const shouldShowSharedToggle =
     isTasksRoute && active && project?.remote_project_id != null;
@@ -135,7 +148,51 @@ export function Navbar() {
     }
   };
 
+  const handleStartDevServer = useCallback(async () => {
+    if (!projectId || !project || !config?.executor_profile || !repos?.length) {
+      return;
+    }
+
+    try {
+      if (attempts.length > 0) {
+        // Has existing attempts, use the first one
+        const firstAttempt = attempts[0];
+        await attemptsApi.startDevServer(firstAttempt.id);
+        navigate(
+          paths.attempt(
+            projectId,
+            firstAttempt.task_id,
+            firstAttempt.id
+          ) + '?view=preview'
+        );
+      } else {
+        // No attempts, create a task with default attempt then start dev server
+        const task = await tasksApi.create(projectId, {
+          title: 'Dev server task',
+          description: 'Auto-generated task for dev server',
+        });
+
+        const attempt = await attemptsApi.create({
+          task_id: task.id,
+          executor_profile_id: config.executor_profile,
+          repos: repos.map((repo) => ({
+            repo_id: repo.id,
+            target_branch: 'main',
+          })),
+        });
+
+        await attemptsApi.startDevServer(attempt.id);
+        navigate(
+          paths.attempt(projectId, task.id, attempt.id) + '?view=preview'
+        );
+      }
+    } catch (err) {
+      console.error('Failed to start dev server:', err);
+    }
+  }, [projectId, project, config, repos, attempts, navigate]);
+
   const isOAuthLoggedIn = loginStatus?.status === 'loggedin';
+  const projectHasDevScript = Boolean(project?.dev_script);
 
   return (
     <div className="border-b bg-background">
@@ -228,6 +285,26 @@ export function Navbar() {
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
+                  {projectHasDevScript && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9"
+                            onClick={handleStartDevServer}
+                            aria-label={t('attempt.actions.startDevServer')}
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          {t('attempt.actions.startDevServer')}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
                 <NavDivider />
               </>
