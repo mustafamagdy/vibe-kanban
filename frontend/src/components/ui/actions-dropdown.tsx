@@ -32,12 +32,14 @@ interface ActionsDropdownProps {
   task?: TaskWithAttemptStatus | null;
   attempt?: Workspace | null;
   sharedTask?: SharedTaskRecord;
+  columnStatus?: string;
 }
 
 export function ActionsDropdown({
   task,
   attempt,
   sharedTask,
+  columnStatus,
 }: ActionsDropdownProps) {
   const { t } = useTranslation('tasks');
   const { projectId } = useProject();
@@ -166,6 +168,15 @@ export function ActionsDropdown({
     });
   };
 
+  const handleMerge = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!attempt?.id || !task) return;
+    GitActionsDialog.show({
+      attemptId: attempt.id,
+      task,
+    });
+  };
+
   const canReassign =
     Boolean(task) &&
     Boolean(sharedTask) &&
@@ -175,6 +186,9 @@ export function ActionsDropdown({
 
   // Task can be started if it's in todo status and doesn't have an in-progress attempt
   const canStartTask = task?.status === 'todo' && !task.has_in_progress_attempt;
+
+  // Task can be merged if it's in the "In review" column
+  const canMergeTask = columnStatus === 'inreview' && attempt?.id;
 
   return (
     <>
@@ -245,6 +259,11 @@ export function ActionsDropdown({
               >
                 {t('actionsMenu.editBranchName')}
               </DropdownMenuItem>
+              {canMergeTask && (
+                <DropdownMenuItem onClick={handleMerge}>
+                  {t('git.states.merge')}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
             </>
           )}
