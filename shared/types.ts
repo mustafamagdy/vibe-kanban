@@ -12,7 +12,11 @@ export type SharedTask = { id: string, organization_id: string, project_id: stri
 
 export type UserData = { user_id: string, first_name: string | null, last_name: string | null, username: string | null, };
 
-export type Project = { id: string, name: string, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, remote_project_id: string | null, created_at: Date, updated_at: Date, };
+export type Project = { id: string, name: string, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, remote_project_id: string | null, created_at: Date, updated_at: Date, 
+/**
+ * JSON serialized workflow configuration for the project
+ */
+workflow_config: { enable_human_review: boolean, max_ai_review_iterations: number, testing_requires_manual_exit: boolean, auto_start_ai_review: boolean, ai_review_prompt_template: string | null, } | null, };
 
 export type CreateProject = { name: string, repositories: Array<CreateProjectRepo>, };
 

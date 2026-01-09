@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO projects (\n                    id,\n                    name\n                ) VALUES (\n                    $1, $2\n                )\n                RETURNING id as \"id!: Uuid\",\n                          name,\n                          dev_script,\n                          dev_script_working_dir,\n                          default_agent_working_dir,\n                          remote_project_id as \"remote_project_id: Uuid\",\n                          created_at as \"created_at!: DateTime<Utc>\",\n                          updated_at as \"updated_at!: DateTime<Utc>\"",
+  "query": "SELECT id as \"id!: Uuid\",\n                      name,\n                      dev_script,\n                      dev_script_working_dir,\n                      default_agent_working_dir,\n                      remote_project_id as \"remote_project_id: Uuid\",\n                      created_at as \"created_at!: DateTime<Utc>\",\n                      updated_at as \"updated_at!: DateTime<Utc>\",\n                      workflow_config\n               FROM projects\n               ORDER BY created_at DESC",
   "describe": {
     "columns": [
       {
@@ -42,21 +42,27 @@
         "name": "updated_at!: DateTime<Utc>",
         "ordinal": 7,
         "type_info": "Text"
+      },
+      {
+        "name": "workflow_config",
+        "ordinal": 8,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 0
     },
     "nullable": [
       true,
       false,
       true,
-      false,
-      false,
+      true,
+      true,
       true,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "ff1ddf3ed4bed81adf8e1d3b8e3c3c8f0fcb9dc51511250f3c32501d8d60f0f0"
+  "hash": "2b657c90f789c9d359bebb453f0a6688bd0cdacd6e29822c988cf0dfe09f98bf"
 }

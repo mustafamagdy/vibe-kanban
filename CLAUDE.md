@@ -45,6 +45,7 @@ Do not manually edit shared/types.ts, instead edit crates/server/src/bin/generat
 ## Active Technologies
 - Rust 1.75+, TypeScript 5.x, React 18 + SQLx, actix-web, ts-rs, Tailwind CSS (01-09-expandable-workflow-phases)
 - PostgreSQL with SQLx migrations (01-09-expandable-workflow-phases)
+- SQLite with SQLx migrations - projects table to add workflow_config JSON column (002-project-workflow-settings)
 
 ## Recent Changes
 - 01-09-expandable-workflow-phases: Added Rust 1.75+, TypeScript 5.x, React 18 + SQLx, actix-web, ts-rs, Tailwind CSS

@@ -7,6 +7,38 @@ use uuid::Uuid;
 
 use super::project_repo::CreateProjectRepo;
 
+/// Project-level workflow configuration
+/// Mirrors WorkflowConfig from services crate (avoiding circular dependency)
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ProjectWorkflowConfig {
+    #[serde(default)]
+    pub enable_human_review: bool,
+
+    #[serde(default = "default_max_ai_review_iterations")]
+    pub max_ai_review_iterations: u32,
+
+    #[serde(default = "default_testing_requires_manual_exit")]
+    pub testing_requires_manual_exit: bool,
+
+    #[serde(default = "default_auto_start_ai_review")]
+    pub auto_start_ai_review: bool,
+
+    #[serde(default)]
+    pub ai_review_prompt_template: Option<String>,
+}
+
+fn default_max_ai_review_iterations() -> u32 {
+    3
+}
+
+fn default_testing_requires_manual_exit() -> bool {
+    true
+}
+
+fn default_auto_start_ai_review() -> bool {
+    true
+}
+
 #[derive(Debug, Error)]
 pub enum ProjectError {
     #[error(transparent)]
@@ -29,6 +61,9 @@ pub struct Project {
     pub created_at: DateTime<Utc>,
     #[ts(type = "Date")]
     pub updated_at: DateTime<Utc>,
+    /// JSON serialized workflow configuration for the project
+    #[ts(type = "{ enable_human_review: boolean, max_ai_review_iterations: number, testing_requires_manual_exit: boolean, auto_start_ai_review: boolean, ai_review_prompt_template: string | null, } | null")]
+    pub workflow_config: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, TS)]
@@ -76,7 +111,8 @@ impl Project {
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
                       created_at as "created_at!: DateTime<Utc>",
-                      updated_at as "updated_at!: DateTime<Utc>"
+                      updated_at as "updated_at!: DateTime<Utc>",
+                      workflow_config
                FROM projects
                ORDER BY created_at DESC"#
         )
@@ -92,7 +128,8 @@ impl Project {
             SELECT p.id as "id!: Uuid", p.name, p.dev_script, p.dev_script_working_dir,
                    p.default_agent_working_dir,
                    p.remote_project_id as "remote_project_id: Uuid",
-                   p.created_at as "created_at!: DateTime<Utc>", p.updated_at as "updated_at!: DateTime<Utc>"
+                   p.created_at as "created_at!: DateTime<Utc>", p.updated_at as "updated_at!: DateTime<Utc>",
+                   p.workflow_config
             FROM projects p
             WHERE p.id IN (
                 SELECT DISTINCT t.project_id
@@ -118,7 +155,8 @@ impl Project {
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
                       created_at as "created_at!: DateTime<Utc>",
-                      updated_at as "updated_at!: DateTime<Utc>"
+                      updated_at as "updated_at!: DateTime<Utc>",
+                      workflow_config
                FROM projects
                WHERE id = $1"#,
             id
@@ -137,7 +175,8 @@ impl Project {
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
                       created_at as "created_at!: DateTime<Utc>",
-                      updated_at as "updated_at!: DateTime<Utc>"
+                      updated_at as "updated_at!: DateTime<Utc>",
+                      workflow_config
                FROM projects
                WHERE rowid = $1"#,
             rowid
@@ -159,7 +198,8 @@ impl Project {
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
                       created_at as "created_at!: DateTime<Utc>",
-                      updated_at as "updated_at!: DateTime<Utc>"
+                      updated_at as "updated_at!: DateTime<Utc>",
+                      workflow_config
                FROM projects
                WHERE remote_project_id = $1
                LIMIT 1"#,
@@ -189,7 +229,8 @@ impl Project {
                           default_agent_working_dir,
                           remote_project_id as "remote_project_id: Uuid",
                           created_at as "created_at!: DateTime<Utc>",
-                          updated_at as "updated_at!: DateTime<Utc>""#,
+                          updated_at as "updated_at!: DateTime<Utc>",
+                          workflow_config"#,
             project_id,
             data.name,
         )
@@ -223,7 +264,8 @@ impl Project {
                          default_agent_working_dir,
                          remote_project_id as "remote_project_id: Uuid",
                          created_at as "created_at!: DateTime<Utc>",
-                         updated_at as "updated_at!: DateTime<Utc>""#,
+                         updated_at as "updated_at!: DateTime<Utc>",
+                         workflow_config"#,
             id,
             name,
             dev_script,
@@ -294,5 +336,41 @@ impl Project {
             .execute(pool)
             .await?;
         Ok(result.rows_affected())
+    }
+
+    /// Update the workflow configuration for a project
+    pub async fn update_workflow_config(
+        pool: &SqlitePool,
+        id: Uuid,
+        workflow_config: Option<String>,
+    ) -> Result<Self, sqlx::Error> {
+        sqlx::query_as!(
+            Project,
+            r#"UPDATE projects
+               SET workflow_config = $2
+               WHERE id = $1
+               RETURNING id as "id!: Uuid",
+                         name,
+                         dev_script,
+                         dev_script_working_dir,
+                         default_agent_working_dir,
+                         remote_project_id as "remote_project_id: Uuid",
+                         created_at as "created_at!: DateTime<Utc>",
+                         updated_at as "updated_at!: DateTime<Utc>",
+                         workflow_config"#,
+            id,
+            workflow_config,
+        )
+        .fetch_one(pool)
+        .await
+    }
+
+    /// Deserialize workflow configuration from JSON string
+    /// Returns default config if workflow_config is None or parsing fails
+    pub fn get_workflow_config(&self) -> ProjectWorkflowConfig {
+        self.workflow_config
+            .as_ref()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or_default()
     }
 }

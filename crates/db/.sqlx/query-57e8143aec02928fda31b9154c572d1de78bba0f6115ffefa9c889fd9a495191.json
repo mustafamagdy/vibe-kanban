@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO execution_process_repo_states (\n                        id,\n                        execution_process_id,\n                        repo_id,\n                        before_head_commit,\n                        after_head_commit,\n                        merge_commit,\n                        had_conflicts_before,\n                        created_at,\n                        updated_at\n                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "57e8143aec02928fda31b9154c572d1de78bba0f6115ffefa9c889fd9a495191"
+}
