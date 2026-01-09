@@ -1286,13 +1286,13 @@ pub trait ContainerService {
     // Status Transition Methods for Expandable Workflow Phases
     // =========================================================================
 
-    /// Validate that a status transition is allowed.
+    /// Validate that a status transition is allowed based on project workflow config.
     /// Returns Ok(()) if valid, Err(reason) if invalid.
     fn validate_status_transition(
         &self,
         from: TaskStatus,
         to: TaskStatus,
-        _config: Option<&super::config::WorkflowConfig>,
+        config: Option<&super::config::ProjectWorkflowConfig>,
     ) -> Result<(), &'static str> {
         use TaskStatus::*;
 
@@ -1300,6 +1300,10 @@ pub trait ContainerService {
         if from == to {
             return Ok(());
         }
+
+        // Get config values with defaults (maintain backward compatibility)
+        let enable_human_review = config.map(|c| c.enable_human_review).unwrap_or(false);
+        let testing_requires_manual_exit = config.map(|c| c.testing_requires_manual_exit).unwrap_or(true);
 
         // Guard conditions before match
         let is_testing_target = matches!(to, Testing);
@@ -1315,7 +1319,6 @@ pub trait ContainerService {
             (Testing, InProgress) => Ok(()), // Return to InProgress for revisions
             (Testing, Done) => Ok(()),
             (Testing, Cancelled) => Ok(()),
-            (InReview, HumanReview) => Ok(()),
             (InReview, Done) => Ok(()),
             (InReview, Cancelled) => Ok(()),
             (HumanReview, Done) => Ok(()),
@@ -1324,6 +1327,24 @@ pub trait ContainerService {
             (InProgress, Done) => Ok(()),
             (InProgress, Cancelled) => Ok(()),
             (Todo, Cancelled) => Ok(()),
+
+            // Human Review requires config enablement
+            (InReview, HumanReview) => {
+                if enable_human_review {
+                    Ok(())
+                } else {
+                    Err("Human Review is not enabled for this project")
+                }
+            }
+
+            // Testing bypass requires testing_requires_manual_exit = false
+            (InProgress, InReview) => {
+                if testing_requires_manual_exit {
+                    Err("Testing phase requires manual exit - tasks must go through Testing before AI Review")
+                } else {
+                    Ok(())
+                }
+            }
 
             // Invalid transitions - specific cases first
             (InReview, InProgress) => Err("Use AI review result handler instead"),
@@ -1354,8 +1375,11 @@ pub trait ContainerService {
             .await?
             .ok_or_else(|| ContainerError::Other(anyhow!("Task not found: {}", task_id)))?;
 
+        // Load project workflow config for validation
+        let config = self.get_workflow_config(task.project_id).await?;
+
         // Validate transition
-        self.validate_status_transition(task.status, TaskStatus::InReview, None)
+        self.validate_status_transition(task.status, TaskStatus::InReview, Some(&config))
             .map_err(ContainerError::InvalidStatusTransition)?;
 
         Task::update_status(&self.db().pool, task_id, TaskStatus::InReview).await?;
@@ -1518,7 +1542,10 @@ pub trait ContainerService {
             .await?
             .ok_or_else(|| ContainerError::Other(anyhow!("Task not found: {}", task_id)))?;
 
-        self.validate_status_transition(task.status, TaskStatus::Done, None)
+        // Load project workflow config for validation
+        let config = self.get_workflow_config(task.project_id).await?;
+
+        self.validate_status_transition(task.status, TaskStatus::Done, Some(&config))
             .map_err(ContainerError::InvalidStatusTransition)?;
 
         Task::update_status(&self.db().pool, task_id, TaskStatus::Done).await?;
@@ -1548,7 +1575,10 @@ pub trait ContainerService {
             .await?
             .ok_or_else(|| ContainerError::Other(anyhow!("Task not found: {}", task_id)))?;
 
-        self.validate_status_transition(task.status, TaskStatus::InProgress, None)
+        // Load project workflow config for validation
+        let config = self.get_workflow_config(task.project_id).await?;
+
+        self.validate_status_transition(task.status, TaskStatus::InProgress, Some(&config))
             .map_err(ContainerError::InvalidStatusTransition)?;
 
         Task::update_status(&self.db().pool, task_id, TaskStatus::InProgress).await?;
@@ -1574,14 +1604,24 @@ pub trait ContainerService {
     }
 
     /// Get workflow configuration for a project.
-    /// Returns default config if not found.
+    /// Returns default config if project has no workflow_config set.
     async fn get_workflow_config(
         &self,
-        _project_id: Uuid,
-    ) -> Result<super::config::WorkflowConfig, ContainerError> {
-        // For now, return default config
-        // TODO: Load from actual config service when implemented
-        Ok(super::config::WorkflowConfig::default())
+        project_id: Uuid,
+    ) -> Result<super::config::ProjectWorkflowConfig, ContainerError> {
+        // Load project and extract workflow config
+        let project = Project::find_by_id(&self.db().pool, project_id)
+            .await?
+            .ok_or_else(|| ContainerError::Other(anyhow!("Project not found: {}", project_id)))?;
+
+        let db_config = project.get_workflow_config();
+        Ok(super::config::ProjectWorkflowConfig {
+            enable_human_review: db_config.enable_human_review,
+            max_ai_review_iterations: db_config.max_ai_review_iterations,
+            testing_requires_manual_exit: db_config.testing_requires_manual_exit,
+            auto_start_ai_review: db_config.auto_start_ai_review,
+            ai_review_prompt_template: db_config.ai_review_prompt_template,
+        })
     }
 }
 
@@ -1704,14 +1744,32 @@ mod status_transition_tests {
         let service = create_test_service();
         use TaskStatus::*;
 
+        // Default config (Human Review disabled, Testing requires manual exit)
+        let default_config = Some(super::super::config::ProjectWorkflowConfig {
+            enable_human_review: false,
+            max_ai_review_iterations: 3,
+            testing_requires_manual_exit: true,
+            auto_start_ai_review: true,
+            ai_review_prompt_template: None,
+        });
+
+        // Config with Human Review enabled
+        let human_review_enabled = Some(super::super::config::ProjectWorkflowConfig {
+            enable_human_review: true,
+            max_ai_review_iterations: 3,
+            testing_requires_manual_exit: true,
+            auto_start_ai_review: true,
+            ai_review_prompt_template: None,
+        });
+
         // Happy path: InProgress -> Testing -> InReview -> Done
         assert!(service.validate_status_transition(Todo, InProgress, None).is_ok());
         assert!(service.validate_status_transition(InProgress, Testing, None).is_ok());
         assert!(service.validate_status_transition(Testing, InReview, None).is_ok());
         assert!(service.validate_status_transition(InReview, Done, None).is_ok());
 
-        // Human Review path
-        assert!(service.validate_status_transition(InReview, HumanReview, None).is_ok());
+        // Human Review path (requires config with enable_human_review = true)
+        assert!(service.validate_status_transition(InReview, HumanReview, human_review_enabled.as_ref()).is_ok());
         assert!(service.validate_status_transition(HumanReview, Done, None).is_ok());
 
         // Testing can return to InProgress for revisions
@@ -1793,5 +1851,67 @@ mod status_transition_tests {
         assert!(config.testing_requires_manual_exit);
         assert!(config.auto_start_ai_review);
         assert!(config.ai_review_prompt_template.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_config_aware_human_review() {
+        let service = create_test_service();
+        use TaskStatus::*;
+
+        let human_review_enabled = Some(super::super::config::ProjectWorkflowConfig {
+            enable_human_review: true,
+            max_ai_review_iterations: 3,
+            testing_requires_manual_exit: true,
+            auto_start_ai_review: true,
+            ai_review_prompt_template: None,
+        });
+
+        let human_review_disabled = Some(super::super::config::ProjectWorkflowConfig {
+            enable_human_review: false,
+            max_ai_review_iterations: 3,
+            testing_requires_manual_exit: true,
+            auto_start_ai_review: true,
+            ai_review_prompt_template: None,
+        });
+
+        // Human Review enabled: InReview -> HumanReview should succeed
+        assert!(service.validate_status_transition(InReview, HumanReview, human_review_enabled.as_ref()).is_ok());
+
+        // Human Review disabled: InReview -> HumanReview should fail
+        assert!(service.validate_status_transition(InReview, HumanReview, human_review_disabled.as_ref()).is_err());
+
+        // With None config (backward compat): Human Review disabled by default
+        assert!(service.validate_status_transition(InReview, HumanReview, None).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_config_aware_testing_bypass() {
+        let service = create_test_service();
+        use TaskStatus::*;
+
+        let testing_bypass_allowed = Some(super::super::config::ProjectWorkflowConfig {
+            enable_human_review: false,
+            max_ai_review_iterations: 3,
+            testing_requires_manual_exit: false, // Bypass allowed
+            auto_start_ai_review: true,
+            ai_review_prompt_template: None,
+        });
+
+        let testing_bypass_blocked = Some(super::super::config::ProjectWorkflowConfig {
+            enable_human_review: false,
+            max_ai_review_iterations: 3,
+            testing_requires_manual_exit: true, // Bypass blocked
+            auto_start_ai_review: true,
+            ai_review_prompt_template: None,
+        });
+
+        // Testing bypass allowed: InProgress -> InReview should succeed
+        assert!(service.validate_status_transition(InProgress, InReview, testing_bypass_allowed.as_ref()).is_ok());
+
+        // Testing bypass blocked: InProgress -> InReview should fail
+        assert!(service.validate_status_transition(InProgress, InReview, testing_bypass_blocked.as_ref()).is_err());
+
+        // With None config (backward compat): Testing requires manual exit by default
+        assert!(service.validate_status_transition(InProgress, InReview, None).is_err());
     }
 }
