@@ -161,7 +161,58 @@ pub trait ContainerService {
         action.next_action.is_none()
     }
 
-    /// Finalize task execution by updating status to InReview and sending notifications
+    /// Check if conflicts were resolved during execution.
+    /// Returns true if any repo had conflicts before execution AND no conflicts remain after.
+    async fn check_conflicts_resolved(
+        &self,
+        ctx: &ExecutionContext,
+    ) -> Result<bool, ContainerError> {
+        let repo_states =
+            ExecutionProcessRepoState::find_by_execution_process_id(&self.db().pool, ctx.execution_process.id)
+                .await?;
+
+        // Check if any repo had conflicts before
+        let had_conflicts_before = repo_states.iter().any(|state| state.had_conflicts_before);
+        if !had_conflicts_before {
+            return Ok(false);
+        }
+
+        // Get workspace root for path resolution
+        let workspace_root = ctx
+            .workspace
+            .container_ref
+            .as_ref()
+            .map(std::path::PathBuf::from)
+            .ok_or_else(|| ContainerError::Other(anyhow!("Container ref not found")))?;
+
+        // Fetch all repos in a single query (avoids N+1)
+        let repo_ids: Vec<_> = repo_states.iter().map(|s| s.repo_id).collect();
+        let repos = Repo::find_by_ids(&self.db().pool, &repo_ids).await?;
+        let repos_map: std::collections::HashMap<Uuid, Repo> = repos.into_iter().map(|r| (r.id, r)).collect();
+
+        // Check if all repos still have conflicts
+        for state in &repo_states {
+            let repo = repos_map.get(&state.repo_id)
+                .ok_or_else(|| ContainerError::Other(anyhow!("Repo not found: {}", state.repo_id)))?;
+
+            let repo_path = workspace_root.join(&repo.name);
+
+            // Check for current conflicts
+            let has_rebase = self.git().is_rebase_in_progress(&repo_path)?;
+            let conflicted_files = self.git().get_conflicted_files(&repo_path)?;
+            let has_conflicts = has_rebase || !conflicted_files.is_empty();
+
+            if has_conflicts {
+                // Conflicts still exist, not resolved
+                return Ok(false);
+            }
+        }
+
+        // All conflicts have been resolved
+        Ok(true)
+    }
+
+    /// Finalize task execution by updating status to InReview (or Done if conflicts resolved) and sending notifications
     async fn finalize_task(
         &self,
         share_publisher: Option<&SharePublisher>,
@@ -172,8 +223,23 @@ pub trait ContainerService {
             return;
         }
 
-        match Task::update_status(&self.db().pool, ctx.task.id, TaskStatus::InReview).await {
+        // Determine final status: Done if conflicts were resolved, otherwise InReview
+        let (final_status, status_message) = if matches!(ctx.execution_process.status, ExecutionProcessStatus::Completed) {
+            match self.check_conflicts_resolved(ctx).await {
+                Ok(true) => (TaskStatus::Done, "conflicts resolved"),
+                _ => (TaskStatus::InReview, "in review"),
+            }
+        } else {
+            (TaskStatus::InReview, "in review")
+        };
+
+        let status_for_log = final_status.clone();
+        match Task::update_status(&self.db().pool, ctx.task.id, final_status).await {
             Ok(_) => {
+                tracing::info!(
+                    "Updated task {} status to {:?} ({})",
+                    ctx.task.id, status_for_log, status_message
+                );
                 if let Some(publisher) = share_publisher
                     && let Err(err) = publisher.update_shared_task_by_id(ctx.task.id).await
                 {
@@ -185,16 +251,25 @@ pub trait ContainerService {
                 }
             }
             Err(e) => {
-                tracing::error!("Failed to update task status to InReview: {e}");
+                tracing::error!("Failed to update task status to {:?}: {}", status_for_log, e);
             }
         }
 
         let title = format!("Task Complete: {}", ctx.task.title);
         let message = match ctx.execution_process.status {
-            ExecutionProcessStatus::Completed => format!(
-                "✅ '{}' completed successfully\nBranch: {:?}\nExecutor: {:?}",
-                ctx.task.title, ctx.workspace.branch, ctx.session.executor
-            ),
+            ExecutionProcessStatus::Completed => {
+                if status_for_log == TaskStatus::Done {
+                    format!(
+                        "✅ '{}' completed - conflicts resolved!\nBranch: {:?}\nExecutor: {:?}",
+                        ctx.task.title, ctx.workspace.branch, ctx.session.executor
+                    )
+                } else {
+                    format!(
+                        "✅ '{}' completed successfully\nBranch: {:?}\nExecutor: {:?}",
+                        ctx.task.title, ctx.workspace.branch, ctx.session.executor
+                    )
+                }
+            }
             ExecutionProcessStatus::Failed => format!(
                 "❌ '{}' execution failed\nBranch: {:?}\nExecutor: {:?}",
                 ctx.task.title, ctx.workspace.branch, ctx.session.executor
@@ -1029,11 +1104,24 @@ pub trait ContainerService {
         for repo in &repositories {
             let repo_path = workspace_root.join(&repo.name);
             let before_head_commit = self.git().get_head_info(&repo_path).ok().map(|h| h.oid);
+
+            // Check if there are any conflicts at the start of execution
+            let has_conflicts = self
+                .git()
+                .is_rebase_in_progress(&repo_path)
+                .unwrap_or(false)
+                || !self
+                    .git()
+                    .get_conflicted_files(&repo_path)
+                    .unwrap_or_default()
+                    .is_empty();
+
             repo_states.push(CreateExecutionProcessRepoState {
                 repo_id: repo.id,
                 before_head_commit,
                 after_head_commit: None,
                 merge_commit: None,
+                had_conflicts_before: has_conflicts,
             });
         }
         let create_execution_process = CreateExecutionProcess {

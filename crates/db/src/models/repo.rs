@@ -80,6 +80,41 @@ impl Repo {
         .await
     }
 
+    /// Find multiple repos by their IDs in a single query (avoids N+1).
+    pub async fn find_by_ids(pool: &SqlitePool, ids: &[Uuid]) -> Result<Vec<Self>, sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Build parameterized placeholders for the IN clause
+        let placeholders: String = (0..ids.len()).map(|i| format!("${}", i + 1)).collect::<Vec<_>>().join(", ");
+        let query = format!(
+            r#"SELECT id, path, name, display_name, created_at, updated_at
+               FROM repos
+               WHERE id IN ({})"#,
+            placeholders
+        );
+
+        // Use a tuple query and map to Repo manually (PathBuf doesn't implement Decode for sqlx)
+        let mut q = sqlx::query_as::<_, (Uuid, String, String, String, DateTime<Utc>, DateTime<Utc>)>(&query);
+        for id in ids {
+            q = q.bind(id);
+        }
+        let rows: Vec<_> = q.fetch_all(pool).await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(id, path, name, display_name, created_at, updated_at)| Self {
+                id,
+                path: PathBuf::from(path),
+                name,
+                display_name,
+                created_at,
+                updated_at,
+            })
+            .collect())
+    }
+
     pub async fn find_or_create<'e, E>(
         executor: E,
         path: &Path,
